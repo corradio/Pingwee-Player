@@ -6,21 +6,77 @@ import urllib2
 from bottle import route, run, template, request, static_file
 from mutagen.id3 import ID3, TXXX, ID3NoHeaderError
 from mutagen.flac import FLAC
+#from threading import Thread
 
-def get_tags(file):
+MAP_ID3_FIELDS = {
+  'tags': 'TXXX:TAG',
+  'album': 'TALB',
+  'artist': 'TPE1',
+  'title': 'TIT2',
+  'date': 'TDRC',
+  'tracknumber': 'TRCK',
+  'first_played': 'TXXX:FIRST_PLAYED',
+  'last_played': 'TXXX:LAST_PLAYED',
+  'play_counter': 'TXXX:LAST_PLAYED',
+  'replaygain_track_gain': 'TXXX:replaygain_track_gain',
+  'replaygain_album_gain': 'TXXX:replaygain_album_gain',
+  'bpm': 'bpm',
+  'lyrics': 'TXXX:LYRICS',
+}
+
+MAP_FLAC_FIELDS = {
+  'tags': 'tag',
+  'album': 'album',
+  'artist': 'artist',
+  'title': 'title',
+  'date': 'date',
+  'tracknumber': 'tracknumber',
+  'first_played': 'first_played',
+  'last_played': 'last_played',
+  'play_counter': 'play_counter',
+  'replaygain_track_gain': 'replaygain_track_gain',
+  'replaygain_album_gain': 'replaygain_album_gain',
+  'bpm': 'bpm',
+  'lyrics': 'lyrics',
+}
+
+FIELDS_TO_LOAD_AT_SCAN = [
+  'tags',
+  'album',
+  'artist',
+  'title',
+  'date',
+  'tracknumber',
+  'play_counter',
+  'bpm',
+]
+
+MULTILINE_FIELDS = [
+  'tags',
+]
+
+def get_track_info(file):
   filename, extension = os.path.splitext(file)
+  info = {}
   if extension.upper() == '.MP3':
     audio = ID3(file)
-    if 'TXXX:TAG' in audio.keys():
-      return audio['TXXX:TAG'].text
-    else:
-      return []
+    for field in FIELDS_TO_LOAD_AT_SCAN:
+      if MAP_ID3_FIELDS[field] in audio.keys():
+        data = UTF8Encode(audio[MAP_ID3_FIELDS[field]].text)
+        if field not in MULTILINE_FIELDS and isinstance(field, list):
+          info[field] = ';'.join(data)
+        else:
+          info[field] = data
   elif extension.upper() == '.FLAC':
     audio = FLAC(file)
-    if 'tag' in audio.keys():
-      return audio['tag']
-    else:
-      return []
+    for field in FIELDS_TO_LOAD_AT_SCAN:
+      if MAP_FLAC_FIELDS[field] in audio.keys():
+        data = UTF8Encode(audio[MAP_FLAC_FIELDS[field]])
+        if field not in MULTILINE_FIELDS and isinstance(field, list):
+          info[field] = ';'.join(data)
+        else:
+          info[field] = data
+  return info
 
 def write_tags(file, tags):
   filename, extension = os.path.splitext(file)
@@ -45,13 +101,22 @@ def print_fields(file):
 def HTMLDecode(s):
   return urllib2.unquote(urllib2.quote(s.encode("utf8")))
 
-LIBRAIRIES = ["/Users/corradio/Music/iTunes/iTunes Media/Dance"]
+LIBRAIRIES = ["/Users/corradio/Music/iTunes/iTunes Media/",
+              "/Users/corradio/Music/Logic"
+              "/Users/corradio/Downloads"]
 MPD_ROOT = "/Users/corradio/Music/"
 EXTENSIONS = ['.MP3', '.FLAC'] # take care of WAV!
 MAP_TAG_TRACKS = {}
 MAP_TRACK_INFO = {}
 
+def UTF8Encode(obj):
+  if isinstance(obj, list):
+    return [s.encode('utf8') for s in obj]
+  else:
+    return obj.encode('uft8')
+
 def scan_library():
+  global MAP_TAG_TRACKS, MAP_TRACK_INFO
   MAP_TAG_TRACKS = {}
   MAP_TRACK_INFO = {}
   for library in LIBRAIRIES:
@@ -63,27 +128,29 @@ def scan_library():
         if ext.upper() in EXTENSIONS:
           try:
             file = os.path.join(dirname, filename)
-            tags = get_tags(file)
-            MAP_TRACK_INFO[file] = {'Tags':tags,
-                                    'Artist':'',
-                                    'Title':''}
-            for tag in tags:
-              if tag in MAP_TAG_TRACKS.keys():
-                MAP_TAG_TRACKS[tag] += [file]
-              else:
-                MAP_TAG_TRACKS[tag] = [file]
-          except Exception as e:
-            print e
-  return MAP_TAG_TRACKS, MAP_TRACK_INFO
+            MAP_TRACK_INFO[file] = get_track_info(file)
+            if 'tags' in MAP_TRACK_INFO[file].keys():
+              tags = MAP_TRACK_INFO[file]['tags']
+              for tag in tags:
+                if tag in MAP_TAG_TRACKS.keys():
+                  MAP_TAG_TRACKS[tag] += [file]
+                else:
+                  MAP_TAG_TRACKS[tag] = [file]
+          except Exception,e: print str(e)
 
 @route('/list_tags')
 def list_tags():
-  return {'Tags':MAP_TAG_TRACKS.keys()}
+  return {'Tags':sorted(MAP_TAG_TRACKS.keys())}
 
 @route('/list_tracks')
 def list_tracks(tag=None):
   tag = HTMLDecode(request.query['tag'])
-  return {'Tag':tag, 'Tracks':MAP_TAG_TRACKS[tag]}
+  tracks = MAP_TAG_TRACKS[tag]
+  return {
+    'Tag': tag,
+    'Tracks': MAP_TAG_TRACKS[tag],
+    'TrackInfos': [MAP_TRACK_INFO[track] for track in tracks]
+  }
 
 @route('/play')
 def play():
@@ -97,6 +164,12 @@ def play():
 def enqueue(track=None):
   track = HTMLDecode(request.query['track'])
   os.system('mpc add "%s"' % track.replace(MPD_ROOT, ''))
+
+@route('/rescan_library')
+def rescan_library():
+  scan_library()
+  #thread = Thread(target=scan_library, args=())
+  #thread.start()
 
 #@route('/edit')
 #def edit():
@@ -123,9 +196,6 @@ def main():
   os.system('mpd')
   os.system('mpc crossfade 2')
   os.system('mpc replaygain track')
-
-  global MAP_TAG_TRACKS, MAP_TRACK_INFO
-  MAP_TAG_TRACKS, MAP_TRACK_INFO = scan_library()
 
   run(host='0.0.0.0', port=8080, reloader=True)
 
