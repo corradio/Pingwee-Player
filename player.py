@@ -9,8 +9,14 @@ class Player:
   MPD_ROOT = "/Users/corradio/Music/"
 
   mpc = mpd.MPDClient()
+  server = None
 
-  def init(self):
+  def enqueue(self, track):
+    self.mpc.add("%s" % track.replace(self.MPD_ROOT, ''))
+
+  def init(self, server):
+    self.server = server
+
     os.system('mpd')
 
     self.mpc.connect("localhost", 6600)
@@ -21,6 +27,13 @@ class Player:
     thread_mpd_fetch_idle.setDaemon(True)
     thread_mpd_fetch_idle.start()
 
+  def get_queue(self):
+    queue = self.mpc.playlist()
+    return {
+      'Tracks': [self.server.library.map_track_info['%s%s' % (self.MPD_ROOT, track.replace('file: ', '').encode('utf8'))] for track in queue],
+      'TrackInfos': [self.server.library.map_track_info['%s%s' % (self.MPD_ROOT, track.replace('file: ', '').encode('utf8'))] for track in queue],
+    }
+
   def mpd_fetch_idle(self):
     mpc = mpd.MPDClient()
     mpc.connect("localhost", 6600)
@@ -28,7 +41,23 @@ class Player:
       mpc.send_idle()
       select.select([mpc], [], [])
       response = mpc.fetch_idle()
-      print 'R: %s' % response
+      for event in response:
+        message = None
+        data = None
+
+        if event == 'playlist':
+          message = 'queue_changed'
+          data = self.get_queue()
+
+        elif event == 'player':
+          message = 'player_changed'
+          data = None
+
+        else:
+          message = event
+
+        print '[PLAYER] Event raised: %s' % message
+        self.server.raise_client_event(message, data)
 
   def playpausetoogle(self):
     return
@@ -38,11 +67,11 @@ class Player:
     self.mpc.add("%s" % track.replace(self.MPD_ROOT, ''))
     self.mpc.play()
 
-  def enqueue(self, track):
-    self.mpc.add("%s" % track.replace(self.MPD_ROOT, ''))
-
   def stop(self):
     self.mpc.stop()
+
+  def update_library(self):
+    self.mpc.update()
 
   def quit(self):
     os.system('mpd --kill')

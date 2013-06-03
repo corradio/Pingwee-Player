@@ -3,7 +3,6 @@
 import library
 import player
 import os
-import urllib2
 
 import tornado.gen
 import tornado.ioloop
@@ -20,10 +19,6 @@ class Server(tornado.web.Application):
   def __init__(self):
     handlers =[
         (r"/", self.MainHandler),
-        (r"/list_tags", self.list_tags),
-        (r"/list_tracks", self.list_tracks),
-        (r"/enqueue", self.enqueue),
-        (r"/play", self.play),
         (r"/websocket", self.sock),
       ]
     settings = dict(
@@ -32,8 +27,43 @@ class Server(tornado.web.Application):
     tornado.web.Application.__init__(self, handlers, **settings)
 
   def init(self):
-    self.player.init()
+    self.player.init(self)
     self.library.init()
+
+  def list_queue(self):
+    queue = player.get_queue()
+    obj = {
+      'Tracks': [map_track_info[track] for track in queue],
+      'TrackInfos': [map_track_info[track] for track in queue]
+    }
+    return obj
+
+  def list_tags(self):
+    map_tag_tracks = self.library.map_tag_tracks
+    obj = {
+      'Tags': sorted(map_tag_tracks.keys())
+    }
+    return obj
+
+  def list_tracks(self, tag):
+    map_tag_tracks = self.library.map_tag_tracks
+    map_track_info = self.library.map_track_info
+    tracks = map_tag_tracks[tag]
+    obj = {
+      'Tag': tag,
+      'Tracks': map_tag_tracks[tag],
+      'TrackInfos': [map_track_info[track] for track in tracks]
+    }
+    return obj
+
+  def raise_client_event(self, message, data):
+    for client in self.clients:
+      client.write_message(
+        {
+          'message': message,
+          'data': data,
+        }
+      )
 
   def run(self):
     self.listen(8080)
@@ -42,76 +72,54 @@ class Server(tornado.web.Application):
     finally:
       self.player.quit()
 
-  def start_library_scan(self, client):
-    # TODO: make async
+  def start_scan_library(self, client):
+    # TODO: make non-blocking
     self.library.scan_library()
-    client.write_message('Library scan finished!')
-
-
-  class enqueue(tornado.web.RequestHandler):
-    def get(self):
-      track = HTMLDecode(self.get_argument('track'))
-      player.enqueue(track)
-
-  class list_queue(tornado.web.RequestHandler):
-    def get(self):
-      track = HTMLDecode(self.get_argument('track'))
-
-      global QUEUE
-      obj = {
-        'Tracks': [map_track_info[track] for track in QUEUE],
-        'TrackInfos': [map_track_info[track] for track in QUEUE]
-      }
-
-      self.write(tornado.escape.json_encode(obj))
-
-  class list_tags(tornado.web.RequestHandler):
-    def get(self):
-      map_tag_tracks = self.application.library.map_tag_tracks
-      obj = {'Tags':sorted(map_tag_tracks.keys())}
-      self.write(tornado.escape.json_encode(obj))
-
-  class list_tracks(tornado.web.RequestHandler):
-    def get(self):
-      map_tag_tracks = self.application.library.map_tag_tracks
-      map_track_info = self.application.library.map_track_info
-      tag = HTMLDecode(self.get_argument('tag'))
-      tracks = map_tag_tracks[tag]
-      obj = {
-        'Tag': tag,
-        'Tracks': map_tag_tracks[tag],
-        'TrackInfos': [map_track_info[track] for track in tracks]
-      }
-      self.write(tornado.escape.json_encode(obj))
+    self.player.update_library()
+    client.write_message('scan_library_finished')
 
   class MainHandler(tornado.web.RequestHandler):
     def get(self):
       self.render("static/musiclibrary.html")
 
-  class play(tornado.web.RequestHandler):
-    def get(self):
-      track = HTMLDecode(self.get_argument('track'))
-      self.application.player.play(track)
-
   class sock(tornado.websocket.WebSocketHandler):
     def open(self):
-      print "WebSocket opened"
+      print "[WS] WebSocket opened"
       self.application.clients += [self]
 
     @tornado.web.asynchronous
     @tornado.gen.engine
     def on_message(self, message):
-      if message == 'scan_library':
-        self.write_message('Library scan started..')
-        self.application.start_library_scan(self)
+      print '[WS] Raw message: %s' % message
+      obj = tornado.escape.json_decode(message)
+      message = obj['message']
+      data = obj['data']
+      if not data and data != '':
+        data = tornado.escape.json_decode(data)
+
+      if message == 'enqueue':
+        self.application.player.enqueue(data['track'])
+
+      elif message == 'list_queue':
+        self.application.raise_client_event('queue', self.application.list_queue())
+
+      elif message == 'list_tags':
+        self.application.raise_client_event('list_tags', self.application.list_tags())
+
+      elif message == 'list_tracks':
+        self.application.raise_client_event('list_tracks', self.application.list_tracks(data['tag']))
+
+      elif message == 'play':
+        self.application.player.play(data['track'])
+
+      elif message == 'scan_library':
+        self.application.raise_client_event('scan_library_started', '')
+        self.application.start_scan_library(self)
 
     def on_close(self):
-      print "WebSocket closed"
+      print "[WS] WebSocket closed"
       self.application.clients.remove(self)
 
-
-def HTMLDecode(s):
-  return urllib2.unquote(urllib2.quote(s.encode("utf8")))
 
 def main():
   server = Server()
