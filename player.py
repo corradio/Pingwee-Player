@@ -11,8 +11,18 @@ class Player:
   mpc = mpd.MPDClient()
   server = None
 
+  def clear_queue(self):
+    self.mpc.clear()
+
   def enqueue(self, track):
     self.mpc.add("%s" % track.replace(self.MPD_ROOT, ''))
+
+  def get_queue(self):
+    queue = self.mpc.playlist()
+    return {
+      'Tracks': [self.server.library.map_track_info['%s%s' % (self.MPD_ROOT, track.replace('file: ', '').encode('utf8'))] for track in queue],
+      'TrackInfos': [self.server.library.map_track_info['%s%s' % (self.MPD_ROOT, track.replace('file: ', '').encode('utf8'))] for track in queue],
+    }
 
   def init(self, server):
     self.server = server
@@ -26,13 +36,6 @@ class Player:
     thread_mpd_fetch_idle = Thread(target=self.mpd_fetch_idle, args=())
     thread_mpd_fetch_idle.setDaemon(True)
     thread_mpd_fetch_idle.start()
-
-  def get_queue(self):
-    queue = self.mpc.playlist()
-    return {
-      'Tracks': [self.server.library.map_track_info['%s%s' % (self.MPD_ROOT, track.replace('file: ', '').encode('utf8'))] for track in queue],
-      'TrackInfos': [self.server.library.map_track_info['%s%s' % (self.MPD_ROOT, track.replace('file: ', '').encode('utf8'))] for track in queue],
-    }
 
   def mpd_fetch_idle(self):
     mpc = mpd.MPDClient()
@@ -60,11 +63,11 @@ class Player:
         self.server.raise_client_event(message, data)
 
   def playpausetoogle(self):
-    return
+    pass
 
   def play(self, track):
-    self.mpc.clear()
-    self.mpc.add("%s" % track.replace(self.MPD_ROOT, ''))
+    self.clear_queue()
+    self.enqueue(track)
     self.mpc.play()
 
   def stop(self):

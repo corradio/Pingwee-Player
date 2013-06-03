@@ -99,6 +99,9 @@ $(window).bind("load", function() {
     request_taglist();
     return;
   };
+  ws.onclose = function() {
+    console.log('ws closed!')
+  }
   ws.onmessage = function (event) {
     if (DEBUG) {
       console.log('Raw message: ' + event.data);
