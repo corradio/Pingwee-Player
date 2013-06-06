@@ -1,3 +1,6 @@
+var ws;
+var DEBUG = true;
+
 function request_taglist() {
   ws.send(JSON.stringify(
     {
@@ -5,6 +8,35 @@ function request_taglist() {
       data: ''
     }
   ));
+}
+
+function request_queue() {
+  ws.send(JSON.stringify(
+    {
+      message: 'list_queue',
+      data: ''
+    }
+  ));
+}
+
+function next_onClick(event){
+  ws.send(JSON.stringify(
+    {
+      message: 'next',
+      data: {track: track}
+    }
+  ));
+  return false;
+}
+
+function stop_onClick(event){
+  ws.send(JSON.stringify(
+    {
+      message: 'stop',
+      data: {track: track}
+    }
+  ));
+  return false;
 }
 
 function tag_onClick(event){
@@ -15,6 +47,7 @@ function tag_onClick(event){
       data: {tag: tag}
     }
   ));
+  return false;
 }
 
 function track_onClickPlay(event){
@@ -36,16 +69,6 @@ function track_onClickEnqueue(event){
       data: {track: track}
     }
   ));
-  return false;
-}
-
-function stop_onClick(event){
-  $.getJSON('stop', null, function(data){});
-  return false;
-}
-
-function next_onClick(event){
-  $.getJSON('next', null, function(data){});
   return false;
 }
 
@@ -87,24 +110,27 @@ function tracklist_onChanged(data){
   }
 }
 
-var ws;
-var DEBUG = false;
-$(window).bind("load", function() {
-  // After page has loaded
-
-  // Start the websocket
+function init_connection() {
+  if (ws != undefined) {
+    ws.onopen = function() {alert('wtf it reopened!');};
+    ws.onclose = function() {alert('wtf it reclosed!');};
+  }
   ws = new WebSocket("ws://127.0.0.1:8080/websocket");
+  ws.onclose = function() {
+    console.log('Connection lost');
+    setTimeout(init_connection, 5000);
+  };
+
   ws.onopen = function() {
-    // This is where we first truly are operational
+    // This is where we first are fully operational, or back from offline mode
     request_taglist();
+    request_queue();
     return;
   };
-  ws.onclose = function() {
-    console.log('ws closed!')
-  }
+
   ws.onmessage = function (event) {
     if (DEBUG) {
-      console.log('Raw message: ' + event.data);
+      console.log('Received raw message: ' + event.data);
     }
     obj = JSON.parse(event.data);
     message = obj.message;
@@ -123,6 +149,15 @@ $(window).bind("load", function() {
       queue_onChanged(data);
     }
   };
+
+  return ws;
+}
+
+$(window).bind("load", function() {
+  // After page has loaded
+
+  // Start the websocket
+  ws = init_connection();
 
   // Do button bindings
   $('#stop').click(stop_onClick);

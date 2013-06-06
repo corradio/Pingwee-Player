@@ -20,7 +20,7 @@ class Library:
     'first_played': 'TXXX:FIRST_PLAYED',
     'first_added': 'TXXX:FIRST_ADDED',
     'last_played': 'TXXX:LAST_PLAYED',
-    'play_counter': 'TXXX:LAST_PLAYED',
+    'play_counter': 'TXXX:PLAY_COUNTER',
     'replaygain_track_gain': 'TXXX:replaygain_track_gain',
     'replaygain_album_gain': 'TXXX:replaygain_album_gain',
     'bpm': 'bpm',
@@ -149,6 +149,15 @@ class Library:
     f = open(self.DATABASE_FILENAME, 'w')
     f.write(data)
     f.close()
+
+  def mark_track_played(self, file):
+    self.write_tag(file, 'last_played', datetime.now().strftime(self.DATETIME_TAG_FORMAT))
+    info = self.get_track_info(file)
+    if 'play_counter' in info.keys():
+      counter = int(info['play_counter']) + 1
+    else:
+      counter = 0
+    self.write_tag(file, 'play_counter', str(counter))
 
   def write_tags(self, file, dictkeyvalues):
     for key in dictkeyvalues.keys():
