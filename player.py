@@ -23,7 +23,6 @@ class Player:
 
   def get_queue(self):
     queue = self.mpc.playlist()
-    print queue
     return {
       'Tracks': [self.parse_mpd_track(track) for track in queue],
       'TrackInfos': [self.server.library.map_track_info[self.parse_mpd_track(track)] for track in queue],
@@ -45,11 +44,11 @@ class Player:
 
     thread_mpd_fetch_idle = Thread(target=self.mpd_fetch_idle, args=())
     thread_mpd_fetch_idle.setDaemon(True)
-    thread_mpd_fetch_idle.start()
+    #thread_mpd_fetch_idle.start()
 
     thread_mpd_detect_track_played = Thread(target=self.mpd_detect_track_played, args=())
     thread_mpd_detect_track_played.setDaemon(True)
-    thread_mpd_detect_track_played.start()
+    #thread_mpd_detect_track_played.start()
 
   def mpd_detect_track_played(self):
     while True:
@@ -95,7 +94,7 @@ class Player:
     self.mpc.next()
 
   def parse_mpd_track(self, track):
-    return '%s%s' % (self.MPD_ROOT, track.replace('file: ', '').encode('utf8'))
+    return '%s%s' % (self.MPD_ROOT, track.replace('file: ', ''))
 
   def playpausetoogle(self):
     if (self.get_status()['state'] == 'play'):

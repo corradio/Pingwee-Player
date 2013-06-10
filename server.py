@@ -48,7 +48,7 @@ class Server(tornado.web.Application):
     tracks = map_tag_tracks[tag]
     obj = {
       'Tag': tag,
-      'Tracks': map_tag_tracks[tag],
+      'Tracks': tracks,
       'TrackInfos': [map_track_info[track] for track in tracks]
     }
     self.raise_client_event('list_tracks', obj)
@@ -59,6 +59,13 @@ class Server(tornado.web.Application):
   def hdl_play(self, socket, data):
     self.player.play(data['track'])
 
+  def hdl_play_tag(self, socket, data):
+    tracks = self.library.map_tag_tracks[data['tag']]
+    self.player.play(tracks)
+
+  def hdl_rename_tag(self, socket, data):
+    self.library.rename_tag(data['old'], data['new'])
+
   def hdl_scan_library(self, socket, data):
     self.raise_client_event('scan_library_started')
     thread_scan_library = Thread(target=self.scan_library, args=([socket]))
@@ -67,6 +74,12 @@ class Server(tornado.web.Application):
 
   def hdl_stop(self, socket, data):
     self.player.stop()
+
+  def hdl_tag_track(self, socket, data):
+    self.library.tag_track(data['track'], data['tag'])
+
+  def hdl_untag_track(self, socket, data):
+    self.library.untag_track(data['track'], data['tag'])
 
   def init(self):
     self.player.init(self)
@@ -77,7 +90,8 @@ class Server(tornado.web.Application):
       'message': message,
       'data': data,
     }
-    print '[WS] -> Sending raw message: %s' % str(obj)
+    #print '[WS] -> Sending raw message: %s' % str(obj)
+    print '[WS] -> Sending message: %s' % message
     for client in self.clients:
       client.write_message(obj)
 
@@ -108,8 +122,12 @@ class Server(tornado.web.Application):
         'list_tracks': self.application.hdl_list_tracks,
         'next': self.application.hdl_next,
         'play': self.application.hdl_play,
+        'play_tag': self.application.hdl_play_tag,
+        'rename_tag': self.application.hdl_rename_tag,
         'scan_library': self.application.hdl_scan_library,
         'stop': self.application.hdl_stop,
+        'tag_track': self.application.hdl_tag_track,
+        'untag_track': self.application.hdl_untag_track,
       }
 
     def open(self):

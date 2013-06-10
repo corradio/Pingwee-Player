@@ -13,7 +13,7 @@ class Library:
   MAP_ID3_FIELDS = {
     'tags': 'TXXX:TAG',
     'album': 'TALB',
-    'artist': 'TPE1',
+    'artist': 'TPE2',
     'title': 'TIT2',
     'date': 'TDRC',
     'tracknumber': 'TRCK',
@@ -109,6 +109,7 @@ class Library:
     print 'Library scan started'
     for library in self.LIBRAIRIES:
       for dirname, dirnames, filenames in os.walk(library):
+        print 'Scanning %s' % dirname
         for filename in filenames:
           file = os.path.join(dirname, filename)
           unused, ext = os.path.splitext(filename)
@@ -157,13 +158,56 @@ class Library:
       counter = int(info['play_counter']) + 1
     else:
       counter = 0
-    self.write_tag(file, 'play_counter', str(counter))
+    self.write_field(file, 'play_counter', str(counter))
 
-  def write_tags(self, file, dictkeyvalues):
+  def rename_tag(self, old, new):
+    # Declare new tag
+    if not new in self.map_tag_tracks.keys():
+      self.map_tag_tracks[new] = []
+    # Fetch tracks to modify
+    tracks = self.map_tag_tracks[old]
+    # Loop through them
+    for track in tracks:
+      # Fetch a track's tags
+      tags = self.map_track_info[track]['tags']
+      # Modify
+      tags.remove(old)
+      tags.append(new)
+      # Commit on file and memory
+      self.map_track_info[track]['tags'] = tags
+      self.write_field(track, 'tags', tags)
+      # Update the taglist
+      self.map_tag_tracks[new].append(track)
+    # Delete old tag  
+    self.map_tag_tracks.pop(old)
+
+  def tag_track(self, track, tag):
+    tags = self.map_track_info[track]['tags']
+    tags.append(tag)
+    self.write_field(track, 'tags', tags)
+    self.map_track_info[track]['tags'] = tags
+    # Declare new tag if needed
+    if not new in self.map_tag_tracks.keys():
+      self.map_tag_tracks[tag] = []
+    # Append
+    self.map_tag_tracks[tag].append(track)
+
+  def untag_track(self, track, tag):
+    tags = self.map_track_info[track]['tags']
+    tags.remove(tag)
+    self.write_field(self, track, 'tags', tags)
+    self.map_track_info[track]['tags'] = tags
+    # Remove track from tag list
+    self.map_tag_tracks[tag].remove(track)
+    # Remove tag if empty
+    if len(self.map_tag_tracks[tag]) == 0:
+      self.map_tag_tracks.pop(tag)
+
+  def write_fields(self, file, dictkeyvalues):
     for key in dictkeyvalues.keys():
-      self.write_tag(file, key, dictkeyvalues[key])
+      self.write_field(file, key, dictkeyvalues[key])
 
-  def write_tag(self, file, field, value):
+  def write_field(self, file, field, value):
     filename, extension = os.path.splitext(file)
     if extension.upper() == '.MP3':
       # Try to open the ID3 tags

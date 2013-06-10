@@ -39,17 +39,6 @@ function stop_onClick(event){
   return false;
 }
 
-function tag_onClick(event){
-  tag = event.data.Tag;
-  ws.send(JSON.stringify(
-    {
-      message: 'list_tracks',
-      data: {tag: tag}
-    }
-  ));
-  return false;
-}
-
 function track_onClickPlay(event){
   track = event.data.Track;
   ws.send(JSON.stringify(
@@ -86,11 +75,35 @@ function queue_onChanged(data){
   return false;
 }
 
+function tag_onClick(event){
+  tag = event.data.Tag;
+  ws.send(JSON.stringify(
+    {
+      message: 'list_tracks',
+      data: {tag: tag}
+    }
+  ));
+  return false;
+}
+
+function tag_onClickPlay(event){
+  tag = event.data.Tag;
+  ws.send(JSON.stringify(
+    {
+      message: 'play_tag',
+      data: {tag: tag}
+    }
+  ));
+  return false;
+}
+
 function taglist_onChanged(data){
   $('#tags').text('');
   for (var i in data.Tags) {
     $('#tags').append("<a href='#'>" + data.Tags[i] + "</a>");
     $('#tags a:last').click( {Tag:data.Tags[i]}, tag_onClick );
+    $('#tags').append("&nbsp;<a href='#'>Play</a>");
+    $('#tags a:last').click( {Tag:data.Tags[i]}, tag_onClickPlay );
     $('#tags').append("<br>");
   }
 }
@@ -115,7 +128,7 @@ function init_connection() {
     ws.onopen = function() {alert('wtf it reopened!');};
     ws.onclose = function() {alert('wtf it reclosed!');};
   }
-  ws = new WebSocket("ws://127.0.0.1:8080/websocket");
+  ws = new WebSocket("ws://127.0.0.1:8088/websocket");
   ws.onclose = function() {
     console.log('Connection lost');
     setTimeout(init_connection, 5000);

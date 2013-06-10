@@ -1,0 +1,12 @@
+body {
+  font-family: Tahoma;
+  font-size: 12px;
+}
+
+.leftbar {
+  float: left;
+}
+
+.footer {
+  clear: both;
+}
