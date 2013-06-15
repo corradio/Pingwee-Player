@@ -1,5 +1,6 @@
 #!/usr/bin/python
 
+import json
 import library
 import player
 import os
@@ -32,14 +33,14 @@ class Server(tornado.web.Application):
     self.player.enqueue(data['track'])
 
   def hdl_list_queue(self, socket, data):
-    self.raise_client_event('queue_changed', self.player.get_queue())
+    self.raise_client_event('queue_changed', self.player.get_queue(), socket)
 
   def hdl_list_tags(self, socket, data):
     map_tag_tracks = self.library.map_tag_tracks
     obj = {
       'Tags': sorted(map_tag_tracks.keys())
     }
-    self.raise_client_event('list_tags', obj)
+    self.raise_client_event('list_tags', obj, socket)
 
   def hdl_list_tracks(self, socket, data):
     tag = data['tag']
@@ -51,7 +52,7 @@ class Server(tornado.web.Application):
       'Tracks': tracks,
       'TrackInfos': [map_track_info[track] for track in tracks]
     }
-    self.raise_client_event('list_tracks', obj)
+    self.raise_client_event('list_tracks', obj, socket)
 
   def hdl_next(self, socket, data):
     self.player.next()
@@ -77,23 +78,35 @@ class Server(tornado.web.Application):
 
   def hdl_tag_track(self, socket, data):
     self.library.tag_track(data['track'], data['tag'])
+    # Broadcast to all clients that the taglist has changed
+    self.hdl_list_tags(None, None)
+    # Broadcast to all clients that the queue has changed
+    self.hdl_list_queue(None, None)
 
   def hdl_untag_track(self, socket, data):
     self.library.untag_track(data['track'], data['tag'])
+    # Broadcast to all clients that the taglist has changed
+    self.hdl_list_tags(None, None)
+    # Broadcast to all clients that the queue has changed
+    self.hdl_list_queue(None, None)
 
   def init(self):
     self.player.init(self)
     self.library.init()
 
-  def raise_client_event(self, message, data=''):
+  def raise_client_event(self, message, data='', client=None):
     obj = {
       'message': message,
       'data': data,
     }
-    #print '[WS] -> Sending raw message: %s' % str(obj)
-    print '[WS] -> Sending message: %s' % message
-    for client in self.clients:
+    if client:
+      print '[WS] -> Sending message to a specific client: %s' % (message)
       client.write_message(obj)
+    else:
+      #print '[WS] -> Broadcasting raw message to %s clients: %s' % (len(self.clients), obj)
+      print '[WS] -> Broadcasting message to %s clients: %s' % (len(self.clients), message)
+      for client in self.clients:
+        client.write_message(obj)
 
   def run(self):
     self.listen(8088)
@@ -103,8 +116,8 @@ class Server(tornado.web.Application):
       self.player.quit()
 
   def scan_library(self, client):
-    self.library.scan_library()
     self.player.update_library()
+    self.library.scan_library()
     self.raise_client_event('scan_library_finished')
 
   class MainHandler(tornado.web.RequestHandler):
@@ -131,18 +144,18 @@ class Server(tornado.web.Application):
       }
 
     def open(self):
-      print "[WS] WebSocket opened"
       self.application.clients += [self]
+      print "[WS] WebSocket opened from %s. Now we have %s clients!" % (str(self.request.remote_ip), len(self.application.clients))
 
     @tornado.web.asynchronous
     @tornado.gen.engine
     def on_message(self, message):
       print '[WS] <- Received raw message: %s' % message
-      obj = tornado.escape.json_decode(message)
+      obj = json.loads(message)
       message = obj['message']
-      data = obj['data']
-      if not data and data != '':
-        data = tornado.escape.json_decode(data)
+      data = None
+      if 'data' in obj.keys():
+        data = obj['data']
 
       if message in self.MESSAGE_HANDLERS.keys():
         self.MESSAGE_HANDLERS[message](self, data)
@@ -150,7 +163,7 @@ class Server(tornado.web.Application):
         print "[WS] Unknown message received: %s" % message
 
     def on_close(self):
-      print "[WS] WebSocket closed"
+      print "[WS] WebSocket closed, now down to %s clients" % len(self.application.clients)
       self.application.clients.remove(self)
 
 

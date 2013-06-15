@@ -13,7 +13,7 @@ class Library:
   MAP_ID3_FIELDS = {
     'tags': 'TXXX:TAG',
     'album': 'TALB',
-    'artist': 'TPE2',
+    'artist': 'TPE1',
     'title': 'TIT2',
     'date': 'TDRC',
     'tracknumber': 'TRCK',
@@ -52,13 +52,19 @@ class Library:
   DATABASE_FILENAME = 'database.json'
 
   LIBRAIRIES = [
-    "/Users/corradio/Music/iTunes/iTunes Media/",
+    "/Users/corradio/Music/iTunes/iTunes Media",
     "/Users/corradio/Music/Logic",
     "/Users/corradio/Music/Library",
     "/Users/corradio/Downloads",
   ]
 
   EXTENSIONS = ['.MP3', '.FLAC']
+
+  SPECIAL_TAGS = [
+    '!NeverPlayed',
+    '!RecentlyAdded',
+    '!Untagged',
+  ]
 
   map_tag_tracks = {}
   map_track_info = {}
@@ -102,16 +108,27 @@ class Library:
     except IOError:
       pass
 
+  def mark_track_played(self, file):
+    self.write_field(file, 'last_played', datetime.now().strftime(self.DATETIME_TAG_FORMAT))
+    info = self.get_track_info(file)
+    if 'play_counter' in info.keys():
+      counter = int(info['play_counter']) + 1
+    else:
+      counter = 0
+    self.write_field(file, 'play_counter', str(counter))
+
   def scan_library(self):
-    self.map_tag_tracks = {'!RecentlyAdded': [], '!Untagged': []}
+    self.map_tag_tracks = {}
     self.map_track_info = {}
+    for tag in self.SPECIAL_TAGS:
+      self.map_tag_tracks[tag] = []
 
     print 'Library scan started'
     for library in self.LIBRAIRIES:
       for dirname, dirnames, filenames in os.walk(library):
-        print 'Scanning %s' % dirname
+        #print 'Scanning %s' % dirname
         for filename in filenames:
-          file = os.path.join(dirname, filename)
+          file = unicode(os.path.join(dirname, filename), 'utf8')
           unused, ext = os.path.splitext(filename)
           if ext.upper() in self.EXTENSIONS:
             try:
@@ -134,7 +151,11 @@ class Library:
                   self.map_tag_tracks['!RecentlyAdded'] += [file]
               else:
                 print 'Welcome to the library %s' % file
-                self.write_tag(file, 'first_added', datetime.now().strftime(self.DATETIME_TAG_FORMAT))
+                self.write_field(file, 'first_added', datetime.now().strftime(self.DATETIME_TAG_FORMAT))
+
+              if not 'play_counter' in self.map_track_info[file].keys():
+                self.map_tag_tracks['!NeverPlayed'] += [file]
+
             except Exception as e:
               print str(e)
           elif ext.upper() in ['.WAV', '.OGG']:
@@ -150,15 +171,6 @@ class Library:
     f = open(self.DATABASE_FILENAME, 'w')
     f.write(data)
     f.close()
-
-  def mark_track_played(self, file):
-    self.write_tag(file, 'last_played', datetime.now().strftime(self.DATETIME_TAG_FORMAT))
-    info = self.get_track_info(file)
-    if 'play_counter' in info.keys():
-      counter = int(info['play_counter']) + 1
-    else:
-      counter = 0
-    self.write_field(file, 'play_counter', str(counter))
 
   def rename_tag(self, old, new):
     # Declare new tag
@@ -178,16 +190,18 @@ class Library:
       self.write_field(track, 'tags', tags)
       # Update the taglist
       self.map_tag_tracks[new].append(track)
-    # Delete old tag  
+    # Delete old tag
     self.map_tag_tracks.pop(old)
 
   def tag_track(self, track, tag):
+    if 'tags' not in self.map_track_info[track]:
+      self.map_track_info[track]['tags'] = []
     tags = self.map_track_info[track]['tags']
     tags.append(tag)
     self.write_field(track, 'tags', tags)
     self.map_track_info[track]['tags'] = tags
     # Declare new tag if needed
-    if not new in self.map_tag_tracks.keys():
+    if not tag in self.map_tag_tracks.keys():
       self.map_tag_tracks[tag] = []
     # Append
     self.map_tag_tracks[tag].append(track)
@@ -195,7 +209,7 @@ class Library:
   def untag_track(self, track, tag):
     tags = self.map_track_info[track]['tags']
     tags.remove(tag)
-    self.write_field(self, track, 'tags', tags)
+    self.write_field(track, 'tags', tags)
     self.map_track_info[track]['tags'] = tags
     # Remove track from tag list
     self.map_tag_tracks[tag].remove(track)

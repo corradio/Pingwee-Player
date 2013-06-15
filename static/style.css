@@ -1,12 +1,25 @@
 body {
   font-family: Tahoma;
-  font-size: 12px;
+  font-size: 14px;
+  line-height: 20px;
 }
 
 .leftbar {
   float: left;
 }
 
+.main {
+  float: left;
+}
+
+.rightbar {
+  float: right;
+}
+
 .footer {
   clear: both;
+}
+
+#edittags {
+  width: 400px;
 }
