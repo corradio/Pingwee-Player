@@ -1,0 +1,7 @@
+#queue > .playing {
+  color: darkblue;
+}
+
+#queue > .selected {
+  background-color: lightblue;
+}
