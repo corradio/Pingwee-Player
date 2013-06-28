@@ -1,5 +1,5 @@
 var ws;
-var DEBUG = true;
+var DEBUG = false;
 var queue;
 var taglist;
 var edittags_selected_track_index = 0;
@@ -63,7 +63,7 @@ function stop_onClick(event){
   ws.send(JSON.stringify(
     {
       message: 'stop',
-      data: {track: track}
+      data: ''
     }
   ));
   return false;
@@ -114,7 +114,7 @@ function taglist_onChanged(data){
     }
   }
   $('#edittags').append("<br>");
-  $('#edittags').append("<input type='text' name='newtag'></input>&nbsp;<input type='button' value='Add'>");
+  $('#edittags').append("<input type='text' name='newtag'></input>&nbsp;<input type='button' value='Add' class='btn btn-primary'>");
   $("#edittags input[type='button']").click( function () {
     newtag = $("#edittags input[name='newtag']").val();
     ws.send(JSON.stringify(
@@ -175,7 +175,10 @@ function queue_onChanged(data){
   $('#playlist').text('');
   for (var i in queue.Tracks) {
     $('#playlist').append("<div></div>");
-    $('#playlist div:last').append("<a href='#'>" + queue.TrackInfos[i].artist + " - " + queue.TrackInfos[i].title + "</a>");
+    $('#playlist div:last').append("<a href='#'>[x]</a>&nbsp;");
+    $('#playlist div:last a:last').click( {Track:queue.Tracks[i], queue_position:i}, queue_track_onDelete );
+    play_counter = (queue.TrackInfos[i].play_counter != undefined) ? queue.TrackInfos[i].play_counter : '0';
+    $('#playlist div:last').append("<a href='#'>" + queue.TrackInfos[i].artist + " - " + queue.TrackInfos[i].title + "</a> (" + play_counter + "x)");
     $('#playlist div:last a:last').click( {Track:queue.Tracks[i], queue_position:i}, queue_track_onClick );
   }
   if (queue.Tracks.length > 0) {
@@ -199,17 +202,38 @@ function queue_track_onClick(event) {
 
   edittags_selected_track_index = queue_position;
 
+  ws.send(JSON.stringify(
+    {
+      message: 'get_coverart',
+      data: {track: queue.Tracks[edittags_selected_track_index]}
+    }
+  ));
+
+  return false;
+}
+
+function queue_track_onDelete(event) {
+  queue_position = event.data.queue_position;
+  ws.send(JSON.stringify(
+    {
+      message: 'remove_from_queue',
+      data: {index: queue_position}
+    }
+  ));
+
   return false;
 }
 
 function init_connection() {
-  if (ws != undefined) {
+  if (ws !== undefined) {
     ws.onopen = function() {alert('wtf it reopened!');};
     ws.onclose = function() {alert('wtf it reclosed!');};
   }
   ws = new WebSocket("ws://" + document.domain + ":8088/websocket");
   ws.onclose = function() {
-    console.log('Connection lost');
+    if (DEBUG) {
+      console.log('Connection lost');
+    }
     setTimeout(init_connection, 5000);
   };
 
@@ -239,6 +263,15 @@ function init_connection() {
 
     } else if (message == "queue_changed") {
       queue_onChanged(data);
+    } else if (message == "get_coverart") {
+      var arrayBuffer = data.data;
+      var image = document.getElementById('cover');
+      if (data != "") {
+        image.src = "data:image/png;base64," + data.data;
+      } else {
+        // TODO: Figure out how to empty image
+        image.src = "data:image/png;base64,";
+      }
     }
   };
 

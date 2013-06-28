@@ -36,15 +36,22 @@ class Player:
       self.mpc.clear()
 
   def enqueue(self, track):
-    with self.mpc:
-      self.mpc.add("%s" % track.replace(self.MPD_ROOT, ''))
+    if isinstance(track, list):
+      for t in track:
+        self.enqueue(t)
+    else:
+      with self.mpc:
+        self.mpc.add("%s" % track.replace(self.MPD_ROOT, ''))
 
   def get_queue(self):
     with self.mpc:
       queue = self.mpc.playlist()
+    status = self.get_status()
+    indexOfCurrentlyPlaying = status['song'] if 'song' in status else ''
     return {
       'Tracks': [self.parse_mpd_track(track) for track in queue],
       'TrackInfos': [self.server.library.map_track_info[self.parse_mpd_track(track)] for track in queue],
+      'CurrentlyPlaying': indexOfCurrentlyPlaying,
     }
 
   def get_status(self):
@@ -58,12 +65,12 @@ class Player:
 
     os.system('mpd')
 
-    logging.basicConfig(level=logging.DEBUG)
+    #logging.basicConfig(level=logging.DEBUG)
 
     with self.mpc:
       self.mpc.connect("localhost", 6600)
-      self.mpc.consume(1)
-      self.mpc.crossfade(2)
+      self.mpc.consume(0)
+      self.mpc.crossfade(4)
       self.mpc.replay_gain_mode('track')
 
     thread_mpd_fetch_idle = Thread(target=self.mpd_fetch_idle, args=())
@@ -85,9 +92,9 @@ class Player:
           time_total = float(time_total)
           if time_played/time_total > 0.5:
             track = self.get_queue()['Tracks'][0]
+            print '[PLAYER] Marking track as played: %s' % track
             self.server.library.mark_track_played(track)
             self.check_for_track_played = False
-            print '[PLAYER] Track marked as played: %s' % track
       time.sleep(1)
 
   def mpd_fetch_idle(self):
@@ -105,7 +112,15 @@ class Player:
           # This is a next song event [we might have reached the end of the queue]
           self.set_current_track_as_new()
           self.server.raise_client_event('queue_changed', self.get_queue())
-          self.server.raise_client_event('player_changed', self.get_status()['state'])
+          status = self.get_status()
+          self.server.raise_client_event(
+            'player_changed',
+            {
+              'State': status['state'],
+              'CurrentlyPlaying': status['song'] if 'song' in status else '',
+            }
+          )
+
       elif len(response) == 1:
         event = response[0]
 
@@ -113,9 +128,16 @@ class Player:
           self.server.raise_client_event('queue_changed', self.get_queue())
 
         elif event == 'player':
-          self.server.raise_client_event('player_changed', self.get_status()['state'])
+          status = self.get_status()
+          self.server.raise_client_event(
+            'player_changed',
+            {
+              'State': status['state'],
+              'CurrentlyPlaying': status['song'] if 'song' in status else '',
+            }
+          )
 
-  def next():
+  def next(self):
     with self.mpc:
       self.mpc.next()
 
@@ -132,22 +154,12 @@ class Player:
     with self.mpc:
       self.mpc.pause()
 
-  def play(self, tracks=None):
-    if isinstance(tracks, list):
-      self.clear_queue()
-      self.set_current_track_as_new()
-      for track in tracks:
-        self.enqueue(track)
-      self.play()
-    elif tracks and tracks != '':
-      self.play([tracks])
-    else:
-      # If player is at the start of a song, then it is
-      # eligible for being marked as played later on
-      status = self.get_status()
-      if status['state'] == 'stop':
-        self.set_current_track_as_new()
-      with self.mpc:
+  def play(self, index=None):
+    self.set_current_track_as_new()
+    with self.mpc:
+      if index:
+        self.mpc.playid(index)
+      else:
         self.mpc.play()
 
   """
@@ -160,6 +172,10 @@ class Player:
   def stop(self):
     with self.mpc:
       self.mpc.stop()
+
+  def remove_from_queue(self, index):
+    with self.mpc:
+      self.mpc.delete(index)
 
   def update_library(self):
     with self.mpc:

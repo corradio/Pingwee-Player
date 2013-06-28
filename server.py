@@ -1,5 +1,6 @@
 #!/usr/bin/python
 
+import base64
 import json
 import library
 import player
@@ -20,14 +21,22 @@ class Server(tornado.web.Application):
   library = library.Library()
 
   def __init__(self):
-    handlers =[
-        (r"/", self.MainHandler),
-        (r"/websocket", self.SocketHandler),
-      ]
+    handlers = [
+      (r"/", self.MainHandler),
+      (r"/websocket", self.SocketHandler),
+    ]
     settings = dict(
       static_path=os.path.join(os.path.dirname(__file__), "static"),
     )
     tornado.web.Application.__init__(self, handlers, **settings)
+
+  def hdl_get_coverart(self, socket, data):
+    cover = self.library.get_track_coverart(data['track'])
+    if not cover:
+      cover = ''
+    else:
+      cover['data'] = base64.b64encode(cover['data'])
+    self.raise_client_event('get_coverart', cover, socket)
 
   def hdl_enqueue(self, socket, data):
     self.player.enqueue(data['track'])
@@ -47,10 +56,11 @@ class Server(tornado.web.Application):
     map_tag_tracks = self.library.map_tag_tracks
     map_track_info = self.library.map_track_info
     tracks = map_tag_tracks[tag]
+    trackinfos = [map_track_info[track] for track in tracks]
     obj = {
       'Tag': tag,
       'Tracks': tracks,
-      'TrackInfos': [map_track_info[track] for track in tracks]
+      'TrackInfos': trackinfos
     }
     self.raise_client_event('list_tracks', obj, socket)
 
@@ -58,23 +68,36 @@ class Server(tornado.web.Application):
     self.player.next()
 
   def hdl_play(self, socket, data):
-    self.player.play(data['track'])
+    if 'index' in data:
+      self.player.play(data['index'])
+    elif 'track' in data:
+      self.player.play(data['track'])
+    else:
+      self.player.play()
+
+  def hdl_play_pause_toogle(self, socket, data):
+    self.player.playpausetoogle()
 
   def hdl_play_tag(self, socket, data):
     tracks = self.library.map_tag_tracks[data['tag']]
-    self.player.play(tracks)
+    self.player.clear_queue()
+    self.player.enqueue(tracks)
+    self.player.play()
 
   def hdl_rename_tag(self, socket, data):
     self.library.rename_tag(data['old'], data['new'])
 
   def hdl_scan_library(self, socket, data):
     self.raise_client_event('scan_library_started')
-    thread_scan_library = Thread(target=self.scan_library, args=([socket]))
+    thread_scan_library = Thread(target=self.scan_library, args=())
     thread_scan_library.setDaemon(True)
     thread_scan_library.start()
 
   def hdl_stop(self, socket, data):
     self.player.stop()
+
+  def hdl_remove_from_queue(self, socket, data):
+    self.player.remove_from_queue(int(data['index']))
 
   def hdl_tag_track(self, socket, data):
     self.library.tag_track(data['track'], data['tag'])
@@ -115,30 +138,33 @@ class Server(tornado.web.Application):
     finally:
       self.player.quit()
 
-  def scan_library(self, client):
+  def scan_library(self):
     self.player.update_library()
     self.library.scan_library()
     self.raise_client_event('scan_library_finished')
 
   class MainHandler(tornado.web.RequestHandler):
     def get(self):
-      self.render("static/musiclibrary.html")
+      self.redirect("static/musiclibrary.html")
 
   class SocketHandler(tornado.websocket.WebSocketHandler):
 
     def __init__(self, application, request):
       tornado.websocket.WebSocketHandler.__init__(self, application, request)
       self.MESSAGE_HANDLERS = {
+        'get_coverart': self.application.hdl_get_coverart,
         'enqueue': self.application.hdl_enqueue,
         'list_queue': self.application.hdl_list_queue,
         'list_tags': self.application.hdl_list_tags,
         'list_tracks': self.application.hdl_list_tracks,
         'next': self.application.hdl_next,
         'play': self.application.hdl_play,
+        'play_pause_toogle': self.application.hdl_play_pause_toogle,
         'play_tag': self.application.hdl_play_tag,
         'rename_tag': self.application.hdl_rename_tag,
         'scan_library': self.application.hdl_scan_library,
         'stop': self.application.hdl_stop,
+        'remove_from_queue': self.application.hdl_remove_from_queue,
         'tag_track': self.application.hdl_tag_track,
         'untag_track': self.application.hdl_untag_track,
       }

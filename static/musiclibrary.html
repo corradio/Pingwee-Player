@@ -1,32 +1,55 @@
-<!DOCTYPE HTML>
-<html>
+<!DOCTYPE html>
+<html data-ng-app="musikApp" data-ng-controller="MainController">
 <head>
-  <script src="/static/jquery-1.9.1.min.js"></script>
-  <script src="/static/musiclibrary.js"></script>
-  <link href="/static/style.css" rel="stylesheet" type="text/css"></link>
-  <div class="wrap">
-    <div class="header">
-      <div id="playcontrols">
+  <link href="style/style.css" rel="stylesheet" type="text/css"></link>
+  <link href="bootstrap/css/bootstrap.min.css" rel="stylesheet" media="screen">
+  </head>
+  <body>
+    <div class="header row-fluid">
+      <div id="playcontrols" class="span*">
         <a href="#" id="stop">Stop</a> 
         <a href="#" id="next">Next</a>
       </div>
     </div>
-    <div class="leftbar">
-      <div id="tags"></div>
-      <div id="tracks"></div>
-    </div>
-    <div class="rightbar">
-      <div class="main">
-        <div id="playlist"></div>
+    <div class="row-fluid">
+      <div class="leftbar span4">
+        <div id="tags"></div>
+        <div id="tracks"></div>
       </div>
-      <div class="rightbar">
-        <div id="edittags"></div>
+      <div class="rightbar span5">
+        <ul id="queue" class="unstyled">
+          <li data-ng-repeat="track in tracks" data-ng-class="{muted: $index<currently_playing, playing: $index==currently_playing, selected: $index==selected_track_index}">
+            <i ng-show="($index==currently_playing) && (player_state=='pause')" class="icon-pause"></i>
+            <i ng-show="($index==currently_playing) && (player_state=='play')" class="icon-play"></i>
+            <i ng-show="($index==currently_playing) && (player_state=='stop')" class="icon-stop"></i>
+            <i ng-show="$index<currently_playing" class="icon-empty"></i>
+            <i ng-show="$index>currently_playing" class="icon-time"></i> 
+            {{track.artist}} - {{track.title}} [{{track.play_counter}}x]
+          </li>
+        </ul>
+        <span id="playlist"</span>
+      </div>
+      <div class="rightbar span3">
+        <img id="cover" width="100px" height="100px" class="img-polaroid"></img>
+        <ul id="edit-tags" class="unstyled">
+          <li data-ng-repeat="tag in tracktags">
+            <input type="checkbox" ng-checked="tag.checked"> {{tag.name}}</input>
+          </li>
+        </ul>
+        <i class="icon-tags"></i>
+        <span id="edittags"></span>
       </div>
     </div>
-    <div id="footer"></div>
-  </div>
-  </head>
-<body>
+    <div id="footer row-fluid">
+      
+    </div>
 
-</body>
+    <script src="js/angular.min.js"></script>
+    <script src="js/jquery-1.9.1.min.js"></script>
+    <script src="bootstrap/js/bootstrap.min.js"></script>
+    <script src="musiclibrary.js"></script>
+    <script src="js/app.js"></script>
+    <script src="js/socket.js"></script>
+    <script src="js/keyboardManager.js"></script>
+  </body>
 </html>

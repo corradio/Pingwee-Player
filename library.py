@@ -6,6 +6,7 @@ import mutagen.id3
 from datetime import datetime
 from mutagen.id3 import ID3, TXXX, ID3NoHeaderError
 from mutagen.flac import FLAC
+from mutagen.mp3 import MP3
 
 
 class Library:
@@ -51,6 +52,8 @@ class Library:
   DATETIME_TAG_FORMAT = '%Y-%m-%d %H:%M:%S'
   DATABASE_FILENAME = 'database.json'
 
+  EXTENSIONS = ['.MP3', '.FLAC']
+
   LIBRAIRIES = [
     "/Users/corradio/Music/iTunes/iTunes Media",
     "/Users/corradio/Music/Logic",
@@ -58,16 +61,37 @@ class Library:
     "/Users/corradio/Downloads",
   ]
 
-  EXTENSIONS = ['.MP3', '.FLAC']
+  PODCAST_DIRECTORIES = [
+    "/Users/corradio/Music/iTunes/iTunes Media/Podcasts"
+  ]
 
   SPECIAL_TAGS = [
     '!NeverPlayed',
+    '!Podcast',
     '!RecentlyAdded',
     '!Untagged',
   ]
 
   map_tag_tracks = {}
   map_track_info = {}
+
+  def get_track_coverart(self, file):
+    filename, extension = os.path.splitext(file)
+    if extension.upper() == '.MP3':
+      audio = MP3(file)
+      if 'APIC:' in audio.tags:
+        return {
+          'data': audio.tags['APIC:'].data,
+          'mime': audio.tags['APIC:'].mime,
+        }
+    elif extension.upper() == '.FLAC':
+      audio = FLAC(file)
+      if len(audio.pictures) > 0:
+        return {
+          'data': audio.pictures[0].data,
+          'mime': audio.pictures[0].mime,
+        }
+
 
   def get_track_info(self, file):
     filename, extension = os.path.splitext(file)
@@ -93,6 +117,10 @@ class Library:
             if not isinstance(data, list):
               data = [data]
             info[field] = data
+
+      #cover = self.get_track_coverart(file)
+      #if cover:
+      #  info['cover'] = cover
     except mutagen.id3.ID3NoHeaderError:
       print 'Warning: No ID3 header found in file %s' % file
     return info
@@ -109,21 +137,28 @@ class Library:
       pass
 
   def mark_track_played(self, file):
-    self.write_field(file, 'last_played', datetime.now().strftime(self.DATETIME_TAG_FORMAT))
-    info = self.get_track_info(file)
+    info = self.map_track_info[file]
     if 'play_counter' in info.keys():
       counter = int(info['play_counter']) + 1
     else:
-      counter = 0
-    self.write_field(file, 'play_counter', str(counter))
+      # This track was never played before, but now it has been.
+      self.map_tag_tracks['!NeverPlayed'].remove(file)
+      counter = 1
+    # Remember that this will trigger a database save
+    self.write_fields(file,
+      {
+        'play_counter': str(counter),
+        'last_played': datetime.now().strftime(self.DATETIME_TAG_FORMAT),
+      }
+    )
 
   def scan_library(self):
-    self.map_tag_tracks = {}
-    self.map_track_info = {}
+    temp_map_tag_tracks = {}
+    temp_map_track_info = {}
     for tag in self.SPECIAL_TAGS:
-      self.map_tag_tracks[tag] = []
+      temp_map_tag_tracks[tag] = []
 
-    print 'Library scan started'
+    print '[LIBRARY] Library scan started'
     for library in self.LIBRAIRIES:
       for dirname, dirnames, filenames in os.walk(library):
         #print 'Scanning %s' % dirname
@@ -132,45 +167,56 @@ class Library:
           unused, ext = os.path.splitext(filename)
           if ext.upper() in self.EXTENSIONS:
             try:
-              self.map_track_info[file] = self.get_track_info(file)
-              if 'tags' in self.map_track_info[file].keys():
-                tags = self.map_track_info[file]['tags']
+              temp_map_track_info[file] = self.get_track_info(file)
+              if 'tags' in temp_map_track_info[file].keys():
+                tags = temp_map_track_info[file]['tags']
                 if len(tags) == 0:
-                  self.map_tag_tracks['!Untagged'] += [file]
+                  temp_map_tag_tracks['!Untagged'] += [file]
                 for tag in tags:
-                  if tag in self.map_tag_tracks.keys():
-                    self.map_tag_tracks[tag] += [file]
+                  if tag in temp_map_tag_tracks.keys():
+                    temp_map_tag_tracks[tag] += [file]
                   else:
-                    self.map_tag_tracks[tag] = [file]
+                    temp_map_tag_tracks[tag] = [file]
               else:
-                self.map_tag_tracks['!Untagged'] += [file]
+                temp_map_tag_tracks['!Untagged'] += [file]
 
               # Special tags
-              if 'first_added' in self.map_track_info[file].keys():
-                if (datetime.now() - datetime.strptime(self.map_track_info[file]['first_added'], self.DATETIME_TAG_FORMAT)).days <= 30:
-                  self.map_tag_tracks['!RecentlyAdded'] += [file]
+
+              # RecentlyAdded
+              if 'first_added' in temp_map_track_info[file].keys():
+                if (datetime.now() - datetime.strptime(temp_map_track_info[file]['first_added'], self.DATETIME_TAG_FORMAT)).days <= 30:
+                  temp_map_tag_tracks['!RecentlyAdded'] += [file]
               else:
                 print 'Welcome to the library %s' % file
                 self.write_field(file, 'first_added', datetime.now().strftime(self.DATETIME_TAG_FORMAT))
+                temp_map_tag_tracks['!RecentlyAdded'] += [file]
 
-              if not 'play_counter' in self.map_track_info[file].keys():
-                self.map_tag_tracks['!NeverPlayed'] += [file]
+
+              if not 'play_counter' in temp_map_track_info[file].keys():
+                temp_map_tag_tracks['!NeverPlayed'] += [file]
+
+              if any([x in os.path.join(dirname, '') for x in self.PODCAST_DIRECTORIES]):
+                temp_map_tag_tracks['!Podcast'] += [file]
 
             except Exception as e:
               print str(e)
           elif ext.upper() in ['.WAV', '.OGG']:
-            print 'Unsupported %s format %s' % (ext.upper(), file)
+            print '[LIBRARY] Unsupported %s format %s' % (ext.upper(), file)
 
-    print 'Library scan finished'
-    data = json.dumps(
-      {
-        'map_tag_tracks': self.map_tag_tracks,
-        'map_track_info': self.map_track_info
-      }
+    # Postprocessing begins
+
+    # Sort !RecentlyAdded by first_added
+    temp_map_tag_tracks['!RecentlyAdded'] = sorted(
+      temp_map_tag_tracks['!RecentlyAdded'],
+      key=lambda track: temp_map_track_info[track]['first_added'],
+      reverse=True,
     )
-    f = open(self.DATABASE_FILENAME, 'w')
-    f.write(data)
-    f.close()
+
+    print '[LIBRARY] Library scan finished'
+    # Commit to memory and disk
+    self.map_tag_tracks = temp_map_tag_tracks
+    self.map_track_info = temp_map_track_info
+    self.save_database()
 
   def rename_tag(self, old, new):
     # Declare new tag
@@ -185,43 +231,60 @@ class Library:
       # Modify
       tags.remove(old)
       tags.append(new)
-      # Commit on file and memory
-      self.map_track_info[track]['tags'] = tags
-      self.write_field(track, 'tags', tags)
+      # Commit on file and db
+      self.write_field(track, 'tags', tags, bypassdbwrite=True)
       # Update the taglist
       self.map_tag_tracks[new].append(track)
     # Delete old tag
     self.map_tag_tracks.pop(old)
+    # Save
+    self.save_database()
+
+  def save_database(self):
+    data = json.dumps(
+      {
+        'map_tag_tracks': self.map_tag_tracks,
+        'map_track_info': self.map_track_info
+      }
+    )
+    f = open(self.DATABASE_FILENAME, 'w')
+    f.write(data)
+    f.close()
+    print '[LIBRARY] Database written.'
 
   def tag_track(self, track, tag):
     if 'tags' not in self.map_track_info[track]:
       self.map_track_info[track]['tags'] = []
     tags = self.map_track_info[track]['tags']
     tags.append(tag)
-    self.write_field(track, 'tags', tags)
-    self.map_track_info[track]['tags'] = tags
+    self.write_field(track, 'tags', tags, bypassdbwrite=True)
     # Declare new tag if needed
     if not tag in self.map_tag_tracks.keys():
       self.map_tag_tracks[tag] = []
     # Append
     self.map_tag_tracks[tag].append(track)
+    # Save
+    self.save_database()
 
   def untag_track(self, track, tag):
     tags = self.map_track_info[track]['tags']
     tags.remove(tag)
-    self.write_field(track, 'tags', tags)
-    self.map_track_info[track]['tags'] = tags
+    self.write_field(track, 'tags', tags, bypassdbwrite=True)
     # Remove track from tag list
     self.map_tag_tracks[tag].remove(track)
     # Remove tag if empty
     if len(self.map_tag_tracks[tag]) == 0:
       self.map_tag_tracks.pop(tag)
+    # Save
+    self.save_database()
 
-  def write_fields(self, file, dictkeyvalues):
+  def write_fields(self, file, dictkeyvalues, bypassdbwrite=False):
     for key in dictkeyvalues.keys():
-      self.write_field(file, key, dictkeyvalues[key])
+      self.write_field(file, key, dictkeyvalues[key], bypassdbwrite=True)
+    if not bypassdbwrite:
+      self.save_database()
 
-  def write_field(self, file, field, value):
+  def write_field(self, file, field, value, bypassdbwrite=False):
     filename, extension = os.path.splitext(file)
     if extension.upper() == '.MP3':
       # Try to open the ID3 tags
@@ -237,8 +300,13 @@ class Library:
       #audio['TXXX:TAG'] = TXXX(encoding=3, desc=u'TAG', text=tags)
     elif extension.upper() == '.FLAC':
       audio = FLAC(file)
-      audio[MAP_FLAC_FIELDS[field]] = value
+      audio[self.MAP_FLAC_FIELDS[field]] = value
     audio.save(file)
+
+    # Update DB
+    self.map_track_info[file][field] = value
+    if not bypassdbwrite:
+      self.save_database()
 
 def UTF8Encode(obj):
   if isinstance(obj, list):
