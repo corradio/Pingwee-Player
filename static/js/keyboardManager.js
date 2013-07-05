@@ -6,7 +6,7 @@ app.factory('keyboardManager', ['$window', '$timeout', function ($window, $timeo
   var defaultOpt = {
     'type':             'keydown',
     'propagate':        false,
-    'inputDisabled':    false,
+    'inputDisabled':    true,
     'target':           $window.document,
     'keyCode':          false
   };
@@ -23,7 +23,6 @@ app.factory('keyboardManager', ['$window', '$timeout', function ($window, $timeo
 
     fct = function (e) {
       e = e || $window.event;
-
       // Disable event handler when focus input and textarea
       if (opt['inputDisabled']) {
         var elt;

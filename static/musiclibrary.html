@@ -6,17 +6,15 @@
   </head>
   <body>
     <div class="header row-fluid">
-      <div id="playcontrols" class="span*">
-        <a href="#" id="stop">Stop</a> 
-        <a href="#" id="next">Next</a>
-      </div>
+
     </div>
-    <div class="row-fluid">
-      <div class="leftbar span4">
+
+    <div id="container">
+      <div id="taglistpanel">
         <div id="tags"></div>
         <div id="tracks"></div>
       </div>
-      <div class="rightbar span5">
+      <div id="queuepanel">
         <ul id="queue" class="unstyled">
           <li data-ng-repeat="track in tracks" data-ng-class="{muted: $index<currently_playing, playing: $index==currently_playing, selected: $index==selected_track_index}">
             <i ng-show="($index==currently_playing) && (player_state=='pause')" class="icon-pause"></i>
@@ -27,27 +25,37 @@
             {{track.artist}} - {{track.title}} [{{track.play_counter}}x]
           </li>
         </ul>
-        <span id="playlist"</span>
       </div>
-      <div class="rightbar span3">
-        <img id="cover" width="100px" height="100px" class="img-polaroid"></img>
-        <ul id="edit-tags" class="unstyled">
-          <li data-ng-repeat="tag in tracktags">
-            <input type="checkbox" ng-checked="tag.checked"> {{tag.name}}</input>
+      <div id="tageditpanel">
+        <img id="cover" class="img-polaroid" ng-src="{{coverdata}}"></img>
+        <ul id="edit-tags" class="unstyled" width="500px">
+          <li data-ng-repeat="tag in selectedtrack_taglist" ng-show="!tag.is_special">
+            <label class='checkbox'><input type="checkbox" ng-model="tag.checked" ng-click="tag.onClick($event, $index)">{{tag.name}}</label>
           </li>
         </ul>
-        <i class="icon-tags"></i>
-        <span id="edittags"></span>
+        <form class="form-inline">
+          <input type="text" class="input-small" placeholder="Enter new tag" ng-model="newtag">
+          <button type="submit" class="btn" ng-click="tag_onAdd()">Add</button>
+        </form>
       </div>
     </div>
+
     <div id="footer row-fluid">
-      
+      <div id="playcontrols" class="span*">
+        <a href="#" id="stop">Stop</a> 
+        <a href="#" id="next">Next</a>
+      </div>
     </div>
+
+    <div id="debugpanel">
+      <pre style="font-size: 0.7em; line-height: 10px; margin: 0px;">{{trackrawdata | json}}</pre>
+    </div>
+
+    <div id="backgroundcontainer" back-img="{{coverdata}}"></div>
 
     <script src="js/angular.min.js"></script>
     <script src="js/jquery-1.9.1.min.js"></script>
     <script src="bootstrap/js/bootstrap.min.js"></script>
-    <script src="musiclibrary.js"></script>
     <script src="js/app.js"></script>
     <script src="js/socket.js"></script>
     <script src="js/keyboardManager.js"></script>

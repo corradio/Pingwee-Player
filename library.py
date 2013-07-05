@@ -75,6 +75,15 @@ class Library:
   map_tag_tracks = {}
   map_track_info = {}
 
+  def delete(self, track):
+    # Library removal
+    if 'tags' in self.map_track_info[track]:
+      for tag in self.map_track_info[track]['tags']:
+        self.untag_track(track, tag)
+    self.map_track_info.pop(track)
+    # IO removal
+    os.remove(track)
+
   def get_track_coverart(self, file):
     filename, extension = os.path.splitext(file)
     if extension.upper() == '.MP3':
@@ -133,6 +142,7 @@ class Library:
       self.map_tag_tracks = data['map_tag_tracks']
       self.map_track_info = data['map_track_info']
       data = None
+      print '[LIBRARY] Database read from file'
     except IOError:
       pass
 
@@ -183,14 +193,14 @@ class Library:
               # Special tags
 
               # RecentlyAdded
-              if 'first_added' in temp_map_track_info[file].keys():
-                if (datetime.now() - datetime.strptime(temp_map_track_info[file]['first_added'], self.DATETIME_TAG_FORMAT)).days <= 30:
-                  temp_map_tag_tracks['!RecentlyAdded'] += [file]
-              else:
+              if not 'first_added' in temp_map_track_info[file].keys():
+                first_added = datetime.now().strftime(self.DATETIME_TAG_FORMAT)
+                self.write_field(file, 'first_added', first_added, True)
+                # Remember that writing here will update the current DB, but not the temporary one we are creating here
+                temp_map_track_info[file]['first_added'] = first_added
                 print 'Welcome to the library %s' % file
-                self.write_field(file, 'first_added', datetime.now().strftime(self.DATETIME_TAG_FORMAT))
-                temp_map_tag_tracks['!RecentlyAdded'] += [file]
-
+              if (datetime.now() - datetime.strptime(temp_map_track_info[file]['first_added'], self.DATETIME_TAG_FORMAT)).days <= 30:
+                  temp_map_tag_tracks['!RecentlyAdded'] += [file]
 
               if not 'play_counter' in temp_map_track_info[file].keys():
                 temp_map_tag_tracks['!NeverPlayed'] += [file]

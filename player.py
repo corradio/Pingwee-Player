@@ -1,6 +1,7 @@
 import logging
 import mpd
 import os
+import osax
 import select
 import time
 
@@ -31,34 +32,50 @@ class Player:
   check_for_track_played = False
   dt_newtrack_played = None
 
+  # Apple Script for controlling volume
+  appscript = None
+
   def clear_queue(self):
     with self.mpc:
       self.mpc.clear()
 
-  def enqueue(self, track):
+  def enqueue(self, track, start=0, length=100):
     if isinstance(track, list):
+      track = track[0:min(length,len(track))]
       for t in track:
         self.enqueue(t)
     else:
       with self.mpc:
-        self.mpc.add("%s" % track.replace(self.MPD_ROOT, ''))
+        try:
+          self.mpc.add("%s" % track.replace(self.MPD_ROOT, ''))
+        except mpd.CommandError as e:
+          print '[PLAYER] MPD error: %s for track %s' % (e, track)
 
   def get_queue(self):
     with self.mpc:
       queue = self.mpc.playlist()
     status = self.get_status()
-    indexOfCurrentlyPlaying = status['song'] if 'song' in status else ''
+    indexOfCurrentlyPlaying = int(status['song']) if 'song' in status else -1
     return {
       'Tracks': [self.parse_mpd_track(track) for track in queue],
       'TrackInfos': [self.server.library.map_track_info[self.parse_mpd_track(track)] for track in queue],
-      'CurrentlyPlaying': indexOfCurrentlyPlaying,
+      'QueueIndexOfCurrentlyPlaying': indexOfCurrentlyPlaying,
     }
+    """
+    return {
+      'Tracks': [self.parse_mpd_track(track) for track in queue],
+      'QueueIndexOfCurrentlyPlaying': indexOfCurrentlyPlaying,
+    }
+    """
 
   def get_status(self):
     with self.mpc:
       status = self.mpc.status()
     return status
     # status.keys gives ['songid', 'playlistlength', 'playlist', 'repeat', 'consume', 'mixrampdb', 'random', 'state', 'xfade', 'volume', 'single', 'mixrampdelay', 'time', 'song', 'elapsed', 'bitrate', 'audio']
+
+  def get_track_info(self, track):
+    return self.server.library.map_track_info[track]
 
   def init(self, server):
     self.server = server
@@ -70,8 +87,12 @@ class Player:
     with self.mpc:
       self.mpc.connect("localhost", 6600)
       self.mpc.consume(0)
-      self.mpc.crossfade(4)
+      self.mpc.crossfade(20)
       self.mpc.replay_gain_mode('track')
+      # Sets the threshold at which songs will be overlapped (no fading)
+      self.mpc.mixrampdb(-15)
+      # Additional overlap
+      self.mpc.mixrampdelay(0.5)
 
     thread_mpd_fetch_idle = Thread(target=self.mpd_fetch_idle, args=())
     thread_mpd_fetch_idle.setDaemon(True)
@@ -80,6 +101,8 @@ class Player:
     thread_mpd_detect_track_played = Thread(target=self.mpd_detect_track_played, args=())
     thread_mpd_detect_track_played.setDaemon(True)
     thread_mpd_detect_track_played.start()
+
+    self.appscript = osax.OSAX()
 
   def mpd_detect_track_played(self):
 
@@ -91,7 +114,8 @@ class Player:
           time_played = float(time_played)
           time_total = float(time_total)
           if time_played/time_total > 0.5:
-            track = self.get_queue()['Tracks'][0]
+            queue = self.get_queue()
+            track = queue['Tracks'][queue['QueueIndexOfCurrentlyPlaying']]
             print '[PLAYER] Marking track as played: %s' % track
             self.server.library.mark_track_played(track)
             self.check_for_track_played = False
@@ -100,30 +124,15 @@ class Player:
   def mpd_fetch_idle(self):
     idlempc = mpd.MPDClient()
     idlempc.connect("localhost", 6600)
+    songid = -1 # Keep track of the songid currently being played
     while True:
       idlempc.send_idle()
       select.select([idlempc], [], [])
       response = idlempc.fetch_idle()
 
-      print '[PLAYER] Event raised: %s' % response
+      print '[PLAYER] MPD event raised: %s' % response
 
-      if len(response) == 2:
-        if 'playlist' in response and 'player' in response:
-          # This is a next song event [we might have reached the end of the queue]
-          self.set_current_track_as_new()
-          self.server.raise_client_event('queue_changed', self.get_queue())
-          status = self.get_status()
-          self.server.raise_client_event(
-            'player_changed',
-            {
-              'State': status['state'],
-              'CurrentlyPlaying': status['song'] if 'song' in status else '',
-            }
-          )
-
-      elif len(response) == 1:
-        event = response[0]
-
+      for event in response:
         if event == 'playlist':
           self.server.raise_client_event('queue_changed', self.get_queue())
 
@@ -133,9 +142,14 @@ class Player:
             'player_changed',
             {
               'State': status['state'],
-              'CurrentlyPlaying': status['song'] if 'song' in status else '',
+              'QueueIndexOfCurrentlyPlaying': int(status['song']) if 'song' in status else '',
             }
           )
+          newsongid = int(status['songid']) if 'songid' in status else -1
+          if songid != -1 and newsongid != songid:
+            # The player automatically transitioned to a new song
+            self.set_current_track_as_new()
+          songid = newsongid
 
   def next(self):
     with self.mpc:
@@ -155,10 +169,13 @@ class Player:
       self.mpc.pause()
 
   def play(self, index=None):
-    self.set_current_track_as_new()
+    # If playback has been resumed, then don't force making
+    # this track eligible for 'played'
+    if (index or self.get_status()['state'] in 'stop'):
+      self.set_current_track_as_new()
     with self.mpc:
       if index:
-        self.mpc.playid(index)
+        self.mpc.play(index)
       else:
         self.mpc.play()
 
@@ -168,6 +185,10 @@ class Player:
   def set_current_track_as_new(self):
     self.check_for_track_played = True
     self.dt_newtrack_played = datetime.now()
+
+  def set_volume(self, value):
+    # Note that input is in range [0, 10]
+    sa.set_volume(value/10.0)
 
   def stop(self):
     with self.mpc:

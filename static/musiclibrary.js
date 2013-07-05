@@ -85,7 +85,7 @@ function tag_onClickPlay(event){
   ws.send(JSON.stringify(
     {
       message: 'play_tag',
-      data: {tag: tag}
+      data: {tag: tag, shuffle: 1}
     }
   ));
   return false;
@@ -202,12 +202,12 @@ function queue_track_onClick(event) {
 
   edittags_selected_track_index = queue_position;
 
-  ws.send(JSON.stringify(
+  /*ws.send(JSON.stringify(
     {
       message: 'get_coverart',
       data: {track: queue.Tracks[edittags_selected_track_index]}
     }
-  ));
+  ));*/
 
   return false;
 }
@@ -264,7 +264,7 @@ function init_connection() {
     } else if (message == "queue_changed") {
       queue_onChanged(data);
     } else if (message == "get_coverart") {
-      var arrayBuffer = data.data;
+      return;
       var image = document.getElementById('cover');
       if (data != "") {
         image.src = "data:image/png;base64," + data.data;
