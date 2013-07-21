@@ -1,5 +1,6 @@
 #!/usr/bin/python
 
+import cloudsyncer
 import coverart
 import base64
 import json
@@ -7,6 +8,8 @@ import library
 import player
 import os
 import random
+import traceback
+import urllib2
 
 import tornado.gen
 import tornado.ioloop
@@ -19,6 +22,7 @@ from threading import Thread
 class Server(tornado.web.Application):
 
   clients = []
+  cloudsyncer = cloudsyncer.CloudSyncer()
   player = player.Player()
   library = library.Library()
 
@@ -33,12 +37,28 @@ class Server(tornado.web.Application):
     tornado.web.Application.__init__(self, handlers, **settings)
 
   def hdl_delete(self, socket, data):
+    queue = self.player.get_queue()
+
     if 'track' in data:
       track = data['track']
     elif 'QueueIndex' in data:
       track = self.player.get_queue()['Tracks'][data['QueueIndex']]
-      self.player.remove_from_queue(data['QueueIndex'])
+    else:
+      # Assume the currently playing track is targetted
+      i = queue['QueueIndexOfCurrentlyPlaying']
+      track = queue['Tracks'][i]
+
+    # Is the current track being played? If yes, remove from playback
+    try:
+      i = queue['Tracks'].index(track)
+      self.player.remove_from_queue(i)
+    except ValueError:
+      pass
+    
     self.library.delete(track)
+
+  def hdl_describe_currently_playing(self, socket, data):
+    self.raise_client_event('describe_currently_playing', self.player.get_currently_playing(), socket)
 
   def hdl_enqueue(self, socket, data):
     self.player.enqueue(data['track'])
@@ -49,30 +69,44 @@ class Server(tornado.web.Application):
     elif 'QueueIndex' in data:
       track = self.player.get_queue()['Tracks'][data['QueueIndex']]
 
-    cover = self.library.get_track_coverart(track)
-    if not cover:
-      print '[SERVER] Cover Art is not available in library: fetching from web.'
-      query = '%s %s %s cover' % (
-        self.library.map_track_info[track]['artist'],
-        self.library.map_track_info[track]['album'],
-        self.library.map_track_info[track]['title']
-      )
-      cover = coverart.getbase64image(query)
-    else:
-      cover = base64.b64encode(cover['data'])
     obj = {
-      'data': cover,
+      'data': '',
       'Track': track,
     }
+
+    cover = self.library.get_track_coverart(track)
+    if cover:
+      obj['data'] = "data:image/png;base64,%s" % base64.b64encode(cover['data'])
+      obj['source'] = cover['source']
+    else:
+      obj['data'] = 'http://static.tumblr.com/jn9hrij/20Ul2zzsr/albumart.jpg'
+      obj['source'] = None
+
+
+    # Move all of this inside the library file
+    """print '[SERVER] Cover Art is not available in library: fetching from web.'
+    query = '%s %s %s cover' % (
+      self.library.map_track_info[track]['artist'] if 'artist' in self.library.map_track_info[track] else '',
+      self.library.map_track_info[track]['album'] if 'album' in self.library.map_track_info[track] else '',
+      self.library.map_track_info[track]['title'] if 'title' in self.library.map_track_info[track] else ''
+    )
+    if query != '%s %s %s cover' % ('', '', ''):
+      obj['data'] = "data:image/png;base64,%s" % coverart.getbase64image(query)
+    """
+    
     self.raise_client_event('get_coverart', obj, socket)
 
   def hdl_list_queue(self, socket, data):
-    self.raise_client_event('queue_changed', self.player.get_queue(), socket)
+    queue = self.player.get_queue()
+    if data and 'index' in data:
+      queue = [queue[data['index']]]
+    self.raise_client_event('queue_changed', queue, socket)
+    self.raise_client_event('describe_queue', queue, socket)
 
   def hdl_list_tags(self, socket, data):
     map_tag_tracks = self.library.map_tag_tracks
     obj = {
-      'Tags': sorted(map_tag_tracks.keys())
+      'Tags': sorted(map_tag_tracks.keys(), key=lambda s: s.lower())
     }
     self.raise_client_event('list_tags', obj, socket)
 
@@ -106,7 +140,7 @@ class Server(tornado.web.Application):
   def hdl_play_tag(self, socket, data):
     tracks = self.library.map_tag_tracks[data['tag']]
     shuffle = bool(data['shuffle']) if 'shuffle' in data else False
-    if shuffle:
+    if shuffle and not data['tag'] == '!RecentlyAdded':
       random.shuffle(tracks)
     self.player.clear_queue()
     self.player.enqueue(tracks)
@@ -121,6 +155,48 @@ class Server(tornado.web.Application):
     thread_scan_library.setDaemon(True)
     thread_scan_library.start()
 
+  def hdl_set_track_coverart(self, socket, data):
+    if 'track' not in data:
+      # Assume the currently playing track is targetted
+      queue = self.player.get_queue()
+      i = queue['QueueIndexOfCurrentlyPlaying']
+      track = queue['Tracks'][i]
+    else:
+      track = data['track']
+
+    if not isinstance(data, dict) and data[0:4] == 'http':
+      # This is a URL, let's fetch from web
+      request = urllib2.Request(data)
+      response = urllib2.urlopen(request)
+      data = {
+        'mime': response.info().getheader('Content-Type'),
+        'data': response.read(),
+      }
+      response.close()
+    else:
+      data['data'] = base64.b64decode(data['data'])
+
+    self.library.set_track_coverart(track, data['data'], data['mime'])
+    self.hdl_get_coverart(socket=None, data={'track': track})
+
+  def hdl_set_track_info(self, socket, data):
+    if 'track' not in data:
+      # Assume the currently playing track is targetted
+      queue = self.player.get_queue()
+      i = queue['QueueIndexOfCurrentlyPlaying']
+      data['track'] = queue['Tracks'][i]
+    for field in data.keys():
+      if field == 'track':
+        continue
+      else:
+        self.library.write_field(
+          data['track'],
+          field,
+          data[field],
+          True
+        )
+    self.library.save_database()
+
   def hdl_stop(self, socket, data):
     self.player.stop()
 
@@ -128,13 +204,23 @@ class Server(tornado.web.Application):
     self.player.remove_from_queue(int(data['QueueIndex']))
 
   def hdl_tag_track(self, socket, data):
-    self.library.tag_track(data['track'], data['tag'])
-    # Broadcast to all clients that the taglist has changed
-    self.hdl_list_tags(None, None)
-    # Broadcast to all clients that the queue has changed
-    self.hdl_list_queue(None, None)
+    if 'track' not in data:
+      # Assume the currently playing track is targetted
+      queue = self.player.get_queue()
+      i = queue['QueueIndexOfCurrentlyPlaying']
+      data['track'] = queue['Tracks'][i]
+    if (self.library.tag_track(data['track'], data['tag'])):
+      # Broadcast to all clients that the taglist has changed
+      self.hdl_list_tags(None, None)
+      # Broadcast to all clients that the queue has changed
+      self.hdl_list_queue(None, None)
 
   def hdl_untag_track(self, socket, data):
+    if 'track' not in data:
+      # Assume the currently playing track is targetted
+      queue = self.player.get_queue()
+      i = queue['QueueIndexOfCurrentlyPlaying']
+      data['track'] = queue['Tracks'][i]
     self.library.untag_track(data['track'], data['tag'])
     # Broadcast to all clients that the taglist has changed
     self.hdl_list_tags(None, None)
@@ -144,6 +230,7 @@ class Server(tornado.web.Application):
   def init(self):
     self.player.init(self)
     self.library.init()
+    self.cloudsyncer.init(self)
 
   def raise_client_event(self, message, data='', client=None):
     obj = {
@@ -183,6 +270,8 @@ class Server(tornado.web.Application):
       tornado.websocket.WebSocketHandler.__init__(self, application, request)
       self.MESSAGE_HANDLERS = {
         'delete': self.application.hdl_delete,
+        'describe_currently_playing': self.application.hdl_describe_currently_playing,
+        'describe_queue': self.application.hdl_list_queue,
         'get_coverart': self.application.hdl_get_coverart,
         'enqueue': self.application.hdl_enqueue,
         'list_queue': self.application.hdl_list_queue,
@@ -194,6 +283,8 @@ class Server(tornado.web.Application):
         'play_tag': self.application.hdl_play_tag,
         'rename_tag': self.application.hdl_rename_tag,
         'scan_library': self.application.hdl_scan_library,
+        'set_track_coverart': self.application.hdl_set_track_coverart,
+        'set_track_info': self.application.hdl_set_track_info,
         'stop': self.application.hdl_stop,
         'remove_from_queue': self.application.hdl_remove_from_queue,
         'tag_track': self.application.hdl_tag_track,
@@ -203,6 +294,12 @@ class Server(tornado.web.Application):
     def open(self):
       self.application.clients += [self]
       print "[WS] WebSocket opened from %s. Now we have %s clients!" % (str(self.request.remote_ip), len(self.application.clients))
+
+      self.application.raise_client_event(
+        'describe_player_state',
+        self.application.player.get_status(),
+        self,
+      )
 
     @tornado.web.asynchronous
     @tornado.gen.engine
@@ -220,11 +317,11 @@ class Server(tornado.web.Application):
         else:
           print "[WS] Unknown message received: %s" % message
       except Exception as e:
-        print "[WS] Exception %s" % e
+        traceback.print_exc()
 
     def on_close(self):
-      print "[WS] WebSocket closed, now down to %s clients" % len(self.application.clients)
       self.application.clients.remove(self)
+      print "[WS] WebSocket closed, now down to %s clients" % len(self.application.clients)
 
 
 def main():

@@ -51,6 +51,25 @@ class Player:
         except mpd.CommandError as e:
           print '[PLAYER] MPD error: %s for track %s' % (e, track)
 
+  def get_currently_playing(self):
+    with self.mpc:
+      queue = self.mpc.playlist()
+    status = self.get_status()
+    indexOfCurrentlyPlaying = int(status['song']) if 'song' in status else -1
+    if indexOfCurrentlyPlaying == -1:
+      return {
+        'Track': None,
+        'TrackInfo': None,
+        'QueueIndexOfCurrentlyPlaying': indexOfCurrentlyPlaying,
+        'Length': len(queue),
+      }
+    return {
+      'Track': self.parse_mpd_track(queue[indexOfCurrentlyPlaying]),
+      'TrackInfo': self.server.library.map_track_info[self.parse_mpd_track(queue[indexOfCurrentlyPlaying])],
+      'QueueIndexOfCurrentlyPlaying': indexOfCurrentlyPlaying,
+      'Length': len(queue),
+    }
+
   def get_queue(self):
     with self.mpc:
       queue = self.mpc.playlist()
@@ -60,6 +79,7 @@ class Player:
       'Tracks': [self.parse_mpd_track(track) for track in queue],
       'TrackInfos': [self.server.library.map_track_info[self.parse_mpd_track(track)] for track in queue],
       'QueueIndexOfCurrentlyPlaying': indexOfCurrentlyPlaying,
+      'Length': len(queue),
     }
     """
     return {

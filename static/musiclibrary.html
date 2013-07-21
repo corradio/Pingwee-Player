@@ -11,23 +11,31 @@
 
     <div id="container">
       <div id="taglistpanel">
+        <ul id="queue" class="unstyled">
+          <li data-ng-repeat="tag in tags">
+            <a ng-click="player.play_tag($index)" href="">{{tag}}</a>
+          </li>
+        </ul>
+
         <div id="tags"></div>
         <div id="tracks"></div>
       </div>
       <div id="queuepanel">
         <ul id="queue" class="unstyled">
-          <li data-ng-repeat="track in tracks" data-ng-class="{muted: $index<currently_playing, playing: $index==currently_playing, selected: $index==selected_track_index}">
-            <i ng-show="($index==currently_playing) && (player_state=='pause')" class="icon-pause"></i>
-            <i ng-show="($index==currently_playing) && (player_state=='play')" class="icon-play"></i>
-            <i ng-show="($index==currently_playing) && (player_state=='stop')" class="icon-stop"></i>
-            <i ng-show="$index<currently_playing" class="icon-empty"></i>
-            <i ng-show="$index>currently_playing" class="icon-time"></i> 
+          <li data-ng-repeat="track in tracks" data-ng-class="{muted: $index<currentlyplaying.index, playing: $index==currentlyplaying.index, selected: $index==selected_track_index}">
+            <i ng-show="($index==currentlyplaying.index) && (player_state=='pause')" class="icon-pause"></i>
+            <i ng-show="($index==currentlyplaying.index) && (player_state=='play')" class="icon-play"></i>
+            <i ng-show="($index==currentlyplaying.index) && (player_state=='stop')" class="icon-stop"></i>
+            <i ng-show="$index<currentlyplaying.index" class="icon-empty"></i>
+            <i ng-show="$index>currentlyplaying.index" class="icon-time"></i>
             {{track.artist}} - {{track.title}} [{{track.play_counter}}x]
           </li>
         </ul>
       </div>
       <div id="tageditpanel">
-        <img id="cover" class="img-polaroid" ng-src="{{coverdata}}"></img>
+        <div class="cover">
+          <img id="cover" ng-src="{{coverdata}}"></img>
+        </div>
         <ul id="edit-tags" class="unstyled" width="500px">
           <li data-ng-repeat="tag in selectedtrack_taglist" ng-show="!tag.is_special">
             <label class='checkbox'><input type="checkbox" ng-model="tag.checked" ng-click="tag.onClick($event, $index)">{{tag.name}}</label>
@@ -41,21 +49,19 @@
     </div>
 
     <div id="footer row-fluid">
-      <div id="playcontrols" class="span*">
-        <a href="#" id="stop">Stop</a> 
-        <a href="#" id="next">Next</a>
-      </div>
     </div>
 
     <div id="debugpanel">
       <pre style="font-size: 0.7em; line-height: 10px; margin: 0px;">{{trackrawdata | json}}</pre>
     </div>
 
-    <div id="backgroundcontainer" back-img="{{coverdata}}"></div>
+    <div id="backgroundcontainer" back-img="{{currentlyplaying.cover}}"></div>
 
     <script src="js/angular.min.js"></script>
     <script src="js/jquery-1.9.1.min.js"></script>
     <script src="bootstrap/js/bootstrap.min.js"></script>
+    <script src="https://s3.amazonaws.com/SwayFM/UnityShim.js"></script>
+
     <script src="js/app.js"></script>
     <script src="js/socket.js"></script>
     <script src="js/keyboardManager.js"></script>

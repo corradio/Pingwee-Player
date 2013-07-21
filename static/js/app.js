@@ -7,6 +7,11 @@ function MainController($scope, socket, keyboardManager) {
   $scope.selected_track_index = 0;
   $scope.tracks = [];
 
+  // Model definition with default values
+  $scope.currentlyplaying = {}
+  $scope.currentlyplaying['cover'] = undefined
+  $scope.currentlyplaying['index'] = undefined
+
   // Socket handlers
   socket.onclose(function() {
     console.log('Connection lost.. will retry in 5seconds');
@@ -28,12 +33,16 @@ function MainController($scope, socket, keyboardManager) {
     socket.send('play_pause_toogle', '');
   });
   keyboardManager.bind('up', function() {
-    $scope.selected_track_index = Math.max($scope.selected_track_index - 1, 0);
-    queue_track_onSelected($scope.selected_track_index);
+    if ($scope.selected_track_index > 0) {
+      $scope.selected_track_index -= 1;
+      queue_track_onSelected($scope.selected_track_index);
+    }
   });
   keyboardManager.bind('down', function() {
-    $scope.selected_track_index = Math.min($scope.selected_track_index + 1, $scope.tracks.length - 1);
-    queue_track_onSelected($scope.selected_track_index);
+    if ($scope.selected_track_index + 1 < $scope.tracks.length) {
+      $scope.selected_track_index += 1;
+      queue_track_onSelected($scope.selected_track_index);
+    }
   });
   keyboardManager.bind('enter', function() {
     socket.send('play', {'QueueIndex': $scope.selected_track_index});
@@ -45,25 +54,95 @@ function MainController($scope, socket, keyboardManager) {
     socket.send('delete', {'QueueIndex': $scope.selected_track_index});
   });
   keyboardManager.bind('ctrl+L', function() {
-    $scope.selected_track_index = $scope.currently_playing;
-    queue_track_onSelected($scope.selected_track_index);
+    $scope.selected_track_index = $scope.currentlyplaying.index;
+    queue_track_onSelected($scope.currentlyplaying.index);
   });
 
+  // Add sway.fm/api support for media keys
+  var unity = UnityMusicShim();
+  unity.setSupports({
+    playpause: true,
+    next: true,
+    previous: true,
+    favorite: false
+  });
+
+  unity.setCallbackObject({
+    pause: function() {
+      console.log("Recieved playpause command");
+      //yourPlayer.pause();
+      socket.send('play_pause_toogle', '');
+    },
+    next: function() {
+      console.log("Recieved next command")
+      //yourPlayer.skip();
+      socket.send('next', '');
+    },
+    previous:function() {
+      console.log("Recieved previous command");
+      //yourPlayer.previous();
+      socket.send('previous', '');
+    }
+  });
+
+  var playerState = {
+    playing: true,
+    title: "Song Title",
+    artist: "Artist Name",
+    albumArt: "http://yoursite.com/path/to/public/image.png",
+  }
+  unity.sendState(playerState);
+  /*var playerState = {
+    playing: false
+  }
+  unity.sendState(playerState);*/
+
+  // Ideas for the API
+  $scope.player = {}
+  $scope.player['play'] = function() {console.log('called');};
+  $scope.player.play();
+
+  $scope.player['play_tag'] = function(index) {
+    console.log('helo');
+    socket.send('play_tag',
+      {
+        'tag': $scope.tags[index],
+        'shuffle': 1
+      }
+    );
+  };
+  // This can be put in a Player() constructor
+
+
   // Events
+  socket.on('describe_player_state', function(data) {
+    $scope.player_state = data.state;
+  });
   socket.on('get_coverart', function(data) {
-    $scope.coverdata = "data:image/png;base64," + data.data;
+    if ($scope.trackIDs[$scope.currentlyplaying.index] == data.Track) {
+      $scope.currentlyplaying.cover = data.data
+    }
+    if ($scope.trackIDs[$scope.selected_track_index] == data.Track) {
+      $scope.coverdata = data.data;
+    }
   });
   socket.on('queue_changed', function(data) {
     $scope.tracks = data.TrackInfos;
     $scope.trackIDs = data.Tracks;
+    $scope.currentlyplaying.index = data.QueueIndexOfCurrentlyPlaying;
     queue_track_onSelected($scope.selected_track_index);
   });
   socket.on('player_changed', function(data) {
     if (data.State !== undefined) {
       $scope.player_state = data.State;
     }
-    if (data.QueueIndexOfCurrentlyPlaying !== undefined) {
-      $scope.currently_playing = data.QueueIndexOfCurrentlyPlaying;
+    if (data.QueueIndexOfCurrentlyPlaying !== undefined && $scope.currentlyplaying.index != data.QueueIndexOfCurrentlyPlaying) {
+      $scope.currentlyplaying.index = data.QueueIndexOfCurrentlyPlaying;
+      socket.send('get_coverart',
+      {
+        'QueueIndex': $scope.currentlyplaying.index
+      }
+    );
     }
   });
   socket.on('list_tags', function(data) {
@@ -96,7 +175,7 @@ function MainController($scope, socket, keyboardManager) {
   // Update events
   function queue_track_onSelected(index) {
     // Use a HashMap here to be able to reference quickly...
-    if ($scope.tags === undefined || $scope.tracks.length == 0) { return; }
+    if ($scope.tags === undefined || $scope.tracks.length == 0 || $scope.tracks[index] === undefined) { return; }
     var found = false;
     for (var i=0; i<$scope.tags.length; i++) {
       found = false;

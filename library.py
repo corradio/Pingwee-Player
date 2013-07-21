@@ -3,10 +3,13 @@
 import json
 import os
 import mutagen.id3
+import traceback
+
 from datetime import datetime
 from mutagen.id3 import ID3, TXXX, ID3NoHeaderError
 from mutagen.flac import FLAC
 from mutagen.mp3 import MP3
+
 
 
 class Library:
@@ -72,6 +75,8 @@ class Library:
     '!Untagged',
   ]
 
+  TRASH_PATH = '/Users/corradio/.Trash'
+
   map_tag_tracks = {}
   map_track_info = {}
 
@@ -82,9 +87,25 @@ class Library:
         self.untag_track(track, tag)
     self.map_track_info.pop(track)
     # IO removal
-    os.remove(track)
+    #os.remove(track)
+    os.rename(track, os.path.join(self.TRASH_PATH, os.path.basename(track)))
+    print "[LIBRARY] Track moved to trash: %s" % track
 
   def get_track_coverart(self, file):
+    def try_fetch_from_filesystem():
+      path = os.path.join(os.path.dirname(file), 'folder.jpg')
+      try:
+        f = open(path, 'r')
+        data = f.read()
+        f.close()
+        return {
+          'data': data,
+          'mime': 'image/jpeg',
+          'source': 'folder.jpg',
+        }
+      except:
+        return None
+
     filename, extension = os.path.splitext(file)
     if extension.upper() == '.MP3':
       audio = MP3(file)
@@ -92,14 +113,43 @@ class Library:
         return {
           'data': audio.tags['APIC:'].data,
           'mime': audio.tags['APIC:'].mime,
+          'source': 'metadata',
         }
+      else:
+        return try_fetch_from_filesystem()
     elif extension.upper() == '.FLAC':
       audio = FLAC(file)
       if len(audio.pictures) > 0:
         return {
           'data': audio.pictures[0].data,
           'mime': audio.pictures[0].mime,
+          'source': 'metadata',
         }
+      else:
+        return try_fetch_from_filesystem()
+
+  def set_track_coverart(self, file, data, mime):
+    filename, extension = os.path.splitext(file)
+    if extension.upper() == '.MP3':
+      audio = MP3(file)
+      apic = mutagen.id3.APIC(
+        desc     = u'',
+        encoding = 3,
+        data     = data,
+        mime     = mime,
+        type     = 3, # Front Cover is 3
+      )
+      audio.tags.add(apic)
+    elif extension.upper() == '.FLAC':
+      audio = mutagen.File(file)
+      image = mutagen.flac.Picture()
+      image.desc = u''
+      image.data = data
+      image.type = 3
+      image.mime = mime
+      audio.add_picture(image)
+    audio.save()
+    print "[LIBRARY] Coverart written in file %s" % os.path.basename(file)
 
 
   def get_track_info(self, file):
@@ -178,22 +228,20 @@ class Library:
           if ext.upper() in self.EXTENSIONS:
             try:
               temp_map_track_info[file] = self.get_track_info(file)
-              if 'tags' in temp_map_track_info[file].keys():
+              if 'tags' in temp_map_track_info[file]:
                 tags = temp_map_track_info[file]['tags']
                 if len(tags) == 0:
                   temp_map_tag_tracks['!Untagged'] += [file]
                 for tag in tags:
-                  if tag in temp_map_tag_tracks.keys():
+                  if tag in temp_map_tag_tracks:
                     temp_map_tag_tracks[tag] += [file]
                   else:
                     temp_map_tag_tracks[tag] = [file]
               else:
                 temp_map_tag_tracks['!Untagged'] += [file]
 
-              # Special tags
-
-              # RecentlyAdded
-              if not 'first_added' in temp_map_track_info[file].keys():
+              # !RecentlyAdded
+              if not 'first_added' in temp_map_track_info[file]:
                 first_added = datetime.now().strftime(self.DATETIME_TAG_FORMAT)
                 self.write_field(file, 'first_added', first_added, True)
                 # Remember that writing here will update the current DB, but not the temporary one we are creating here
@@ -202,14 +250,22 @@ class Library:
               if (datetime.now() - datetime.strptime(temp_map_track_info[file]['first_added'], self.DATETIME_TAG_FORMAT)).days <= 30:
                   temp_map_tag_tracks['!RecentlyAdded'] += [file]
 
-              if not 'play_counter' in temp_map_track_info[file].keys():
+              # !NeverPlayed
+              if not 'play_counter' in temp_map_track_info[file]:
                 temp_map_tag_tracks['!NeverPlayed'] += [file]
 
+              # !Podcast
               if any([x in os.path.join(dirname, '') for x in self.PODCAST_DIRECTORIES]):
                 temp_map_tag_tracks['!Podcast'] += [file]
 
-            except Exception as e:
-              print str(e)
+              # ReplayGain support
+              if not 'replaygain_track_gain' in temp_map_track_info[file]:
+                print 'No RG. For FLAC, call metaflac --add-replay-gain [file]. Figure it out for MP3s. Then remember to update the library.'
+                # Re-read tags
+                #temp_map_track_info[file] = self.get_track_info(file)
+
+            except Exception, e:
+              traceback.print_exc()
           elif ext.upper() in ['.WAV', '.OGG']:
             print '[LIBRARY] Unsupported %s format %s' % (ext.upper(), file)
 
@@ -266,6 +322,9 @@ class Library:
     if 'tags' not in self.map_track_info[track]:
       self.map_track_info[track]['tags'] = []
     tags = self.map_track_info[track]['tags']
+    if tag in tags:
+      # It's already there
+      return False
     tags.append(tag)
     self.write_field(track, 'tags', tags, bypassdbwrite=True)
     # Declare new tag if needed
@@ -275,6 +334,7 @@ class Library:
     self.map_tag_tracks[tag].append(track)
     # Save
     self.save_database()
+    return True
 
   def untag_track(self, track, tag):
     tags = self.map_track_info[track]['tags']
@@ -312,11 +372,13 @@ class Library:
       audio = FLAC(file)
       audio[self.MAP_FLAC_FIELDS[field]] = value
     audio.save(file)
+    print "[LIBRARY] Field '%s' written in file %s" % (field, os.path.basename(file))
 
-    # Update DB
-    self.map_track_info[file][field] = value
-    if not bypassdbwrite:
-      self.save_database()
+    # Update DB if needed
+    if file in self.map_track_info:
+      self.map_track_info[file][field] = value
+      if not bypassdbwrite:
+        self.save_database()
 
 def UTF8Encode(obj):
   if isinstance(obj, list):
