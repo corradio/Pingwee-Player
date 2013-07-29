@@ -85,6 +85,10 @@ div.cover > img {
   width: 100%;
 }
 
+div.cover > img.over {
+  -webkit-filter: grayscale(0.5) blur(2px);
+}
+
 #debugpanel {
   position: fixed;
   left: 0px;

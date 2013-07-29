@@ -11,6 +11,7 @@
 
     <div id="container">
       <div id="taglistpanel">
+        <a ng-click="player.scan_library()" href="">[Scan Library{{scan_state}}]</a>
         <ul id="queue" class="unstyled">
           <li data-ng-repeat="tag in tags">
             <a ng-click="player.play_tag($index)" href="">{{tag}}</a>

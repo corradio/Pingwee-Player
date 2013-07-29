@@ -52,6 +52,7 @@ class Server(tornado.web.Application):
     try:
       i = queue['Tracks'].index(track)
       self.player.remove_from_queue(i)
+      print "[SERVER] Track removed from queue index %d: %s" % (i, track)
     except ValueError:
       pass
     
@@ -164,9 +165,9 @@ class Server(tornado.web.Application):
     else:
       track = data['track']
 
-    if not isinstance(data, dict) and data[0:4] == 'http':
+    if 'url' in data.keys():
       # This is a URL, let's fetch from web
-      request = urllib2.Request(data)
+      request = urllib2.Request(data['url'])
       response = urllib2.urlopen(request)
       data = {
         'mime': response.info().getheader('Content-Type'),

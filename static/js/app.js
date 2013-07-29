@@ -6,6 +6,7 @@ function MainController($scope, socket, keyboardManager) {
   $scope.player_state = 'stop';
   $scope.selected_track_index = 0;
   $scope.tracks = [];
+  $scope.scan_state = "";
 
   // Model definition with default values
   $scope.currentlyplaying = {}
@@ -103,13 +104,16 @@ function MainController($scope, socket, keyboardManager) {
   $scope.player.play();
 
   $scope.player['play_tag'] = function(index) {
-    console.log('helo');
     socket.send('play_tag',
       {
         'tag': $scope.tags[index],
         'shuffle': 1
       }
     );
+  };
+
+  $scope.player['scan_library'] = function() {
+    socket.send('scan_library', '');
   };
   // This can be put in a Player() constructor
 
@@ -171,6 +175,12 @@ function MainController($scope, socket, keyboardManager) {
 
     queue_track_onSelected($scope.selected_track_index);
   });
+  socket.on('scan_library_started', function(data) {
+    $scope.scan_state = ' (scanning)';
+  })
+  socket.on('scan_library_finished', function(data) {
+    $scope.scan_state = '';
+  })
 
   // Update events
   function queue_track_onSelected(index) {
@@ -224,6 +234,53 @@ function MainController($scope, socket, keyboardManager) {
     console.log('changed');
     console.log(newval);
   }, true);*/
+
+  // Add UI event listeners
+  var cov = document.getElementById('cover');
+
+  cov.addEventListener('dragenter', function(e) {
+      cov.classList.add('over');
+      e.stopPropagation();
+      e.preventDefault();
+    },
+    false
+  );
+  cov.addEventListener('dragleave', function(e) {
+      cov.classList.remove('over');
+      e.stopPropagation();
+      e.preventDefault();
+    },
+    false
+  );
+  cov.addEventListener('dragover', function(e) {
+      e.stopPropagation();
+      e.preventDefault();
+    },
+    false
+  );
+  cov.addEventListener('drop', function(e) {
+      //console.log(e.dataTransfer.files);
+      data = e.dataTransfer.items[0];
+      if (data.type == "text/uri-list") {
+        console.log('Setting cover to dropped URL');
+        data.getAsString( function(url){
+          socket.send('set_track_coverart',
+            {
+              track: $scope.trackIDs[$scope.selected_track_index],
+              url: url
+            }
+          );
+        });
+      } else {
+        console.log('Type ' + data.type + ' is not supported');
+      }
+
+      cov.classList.remove('over');
+      e.stopPropagation();
+      e.preventDefault();
+    },
+    false
+  );
 
   // Start the sockets!
   socket.init();
