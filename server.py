@@ -243,7 +243,7 @@ class Server(tornado.web.Application):
       client.write_message(obj)
     else:
       #print '[WS] -> Broadcasting raw message to %s clients: %s' % (len(self.clients), obj)
-      print '[WS] -> Broadcasting message to %s clients: %s' % (len(self.clients), message)
+      print '[WS] -> Broadcasting message to all (%s) clients: %s' % (len(self.clients), message)
       for client in self.clients:
         client.write_message(obj)
 

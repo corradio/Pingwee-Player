@@ -11,15 +11,14 @@
 
     <div id="container">
       <div id="taglistpanel">
-        <a ng-click="player.scan_library()" href="">[Scan Library{{scan_state}}]</a>
-        <ul id="queue" class="unstyled">
-          <li data-ng-repeat="tag in tags">
-            <a ng-click="player.play_tag($index)" href="">{{tag}}</a>
-          </li>
-        </ul>
-
-        <div id="tags"></div>
-        <div id="tracks"></div>
+        <div id="taglist">
+          <a ng-click="player.scan_library()" href="">[Scan Library{{scan_state}}]</a>
+          <ul id="queue" class="unstyled">
+            <li data-ng-repeat="tag in tags">
+              <a ng-click="player.play_tag($index)" href="">{{tag}}</a>
+            </li>
+          </ul>
+        </div>
       </div>
       <div id="queuepanel">
         <ul id="queue" class="unstyled">
@@ -34,18 +33,20 @@
         </ul>
       </div>
       <div id="tageditpanel">
-        <div class="cover">
-          <img id="cover" ng-src="{{coverdata}}"></img>
+        <div id="tagedits">
+          <div class="cover">
+            <img id="cover" ng-src="{{coverdata}}"></img>
+          </div>
+          <ul id="edit-tags" class="unstyled" width="500px">
+            <li data-ng-repeat="tag in selectedtrack_taglist" ng-show="!tag.is_special">
+              <label class='checkbox'><input type="checkbox" ng-model="tag.checked" ng-click="tag.onClick($event, $index)">{{tag.name}}</label>
+            </li>
+          </ul>
+          <form class="form-inline">
+            <input type="text" class="input-small" placeholder="Enter new tag" ng-model="newtag">
+            <button type="submit" class="btn" ng-click="tag_onAdd()">Add</button>
+          </form>
         </div>
-        <ul id="edit-tags" class="unstyled" width="500px">
-          <li data-ng-repeat="tag in selectedtrack_taglist" ng-show="!tag.is_special">
-            <label class='checkbox'><input type="checkbox" ng-model="tag.checked" ng-click="tag.onClick($event, $index)">{{tag.name}}</label>
-          </li>
-        </ul>
-        <form class="form-inline">
-          <input type="text" class="input-small" placeholder="Enter new tag" ng-model="newtag">
-          <button type="submit" class="btn" ng-click="tag_onAdd()">Add</button>
-        </form>
       </div>
     </div>
 

@@ -44,30 +44,40 @@
 }
 
 #taglistpanel {
-  position: fixed;
+  position: absolute;
   top: 0px;
   left: 0px;
   float:left;
   height: 100%;
-  padding: 15px;
   background: rgba(255, 255, 255, 0.7);
+  overflow-y: auto;
+}
+
+#taglist {
+  margin: 15px;
 }
 
 #queuepanel {
   margin-left: 15%;
   margin-right: 22%;
   margin-top: 100px;
+  overflow-y: auto;
+  height: 80%;
 }
 
 #tageditpanel {
-  position: fixed;
+  position: absolute;
   top: 0px;
   right: 0px;
   float:right;
   height: 100%;
-  padding: 10px;
   background: rgba(255, 255, 255, 0.7);
   width: 15%;
+  overflow-y: auto;
+}
+
+#tagedits {
+  margin: 15px;
 }
 
 #tageditpanel > div.cover {

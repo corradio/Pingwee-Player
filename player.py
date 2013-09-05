@@ -188,13 +188,13 @@ class Player:
     with self.mpc:
       self.mpc.pause()
 
-  def play(self, index=None):
+  def play(self, index=-1):
     # If playback has been resumed, then don't force making
     # this track eligible for 'played'
-    if (index or self.get_status()['state'] in 'stop'):
+    if (index > -1 or self.get_status()['state'] in 'stop'):
       self.set_current_track_as_new()
     with self.mpc:
-      if index:
+      if index > -1:
         self.mpc.play(index)
       else:
         self.mpc.play()

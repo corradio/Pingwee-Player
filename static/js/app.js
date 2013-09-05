@@ -70,17 +70,17 @@ function MainController($scope, socket, keyboardManager) {
 
   unity.setCallbackObject({
     pause: function() {
-      console.log("Recieved playpause command");
+      console.log("Received playpause command");
       //yourPlayer.pause();
       socket.send('play_pause_toogle', '');
     },
     next: function() {
-      console.log("Recieved next command")
+      console.log("Received next command")
       //yourPlayer.skip();
       socket.send('next', '');
     },
     previous:function() {
-      console.log("Recieved previous command");
+      console.log("Received previous command");
       //yourPlayer.previous();
       socket.send('previous', '');
     }

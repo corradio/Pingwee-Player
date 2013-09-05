@@ -84,11 +84,15 @@ class Library:
     # Library removal
     if 'tags' in self.map_track_info[track]:
       for tag in self.map_track_info[track]['tags']:
-        self.untag_track(track, tag)
-    self.map_track_info.pop(track)
+        self.map_tag_tracks[tag].remove(track)
+        if len(self.map_tag_tracks[tag]) == 0:
+          del self.map_tag_tracks[tag]
+    del self.map_track_info[track]
     # IO removal
     #os.remove(track)
     os.rename(track, os.path.join(self.TRASH_PATH, os.path.basename(track)))
+    # Save
+    self.save_database()
     print "[LIBRARY] Track moved to trash: %s" % track
 
   def get_track_coverart(self, file):
@@ -247,7 +251,7 @@ class Library:
                 # Remember that writing here will update the current DB, but not the temporary one we are creating here
                 temp_map_track_info[file]['first_added'] = first_added
                 print 'Welcome to the library %s' % file
-              if (datetime.now() - datetime.strptime(temp_map_track_info[file]['first_added'], self.DATETIME_TAG_FORMAT)).days <= 30:
+              if (datetime.now() - datetime.strptime(temp_map_track_info[file]['first_added'], self.DATETIME_TAG_FORMAT)).days <= 60:
                   temp_map_tag_tracks['!RecentlyAdded'] += [file]
 
               # !NeverPlayed
@@ -302,7 +306,7 @@ class Library:
       # Update the taglist
       self.map_tag_tracks[new].append(track)
     # Delete old tag
-    self.map_tag_tracks.pop(old)
+    del self.map_tag_tracks[old]
     # Save
     self.save_database()
 
@@ -344,7 +348,7 @@ class Library:
     self.map_tag_tracks[tag].remove(track)
     # Remove tag if empty
     if len(self.map_tag_tracks[tag]) == 0:
-      self.map_tag_tracks.pop(tag)
+      del self.map_tag_tracks[tag]
     # Save
     self.save_database()
 
