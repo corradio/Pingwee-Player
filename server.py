@@ -1,5 +1,6 @@
 #!/usr/bin/python
 
+import cdburner
 import cloudsyncer
 import coverart
 import base64
@@ -22,9 +23,11 @@ from threading import Thread
 class Server(tornado.web.Application):
 
   clients = []
+
+  cdburner = cdburner.CDBurner()
   cloudsyncer = cloudsyncer.CloudSyncer()
-  player = player.Player()
   library = library.Library()
+  player = player.Player()
 
   def __init__(self):
     handlers = [
@@ -35,6 +38,14 @@ class Server(tornado.web.Application):
       static_path=os.path.join(os.path.dirname(__file__), "static"),
     )
     tornado.web.Application.__init__(self, handlers, **settings)
+
+  def hdl_burn_cd(self, socket, data):
+    tag = 'Burn'
+    map_tag_tracks = self.library.map_tag_tracks
+    map_track_info = self.library.map_track_info
+    tracks = map_tag_tracks[tag]
+    trackinfos = [map_track_info[track] for track in tracks]
+    self.cdburner.burn_cd(tracks, trackinfos)
 
   def hdl_delete(self, socket, data):
     queue = self.player.get_queue()
@@ -232,6 +243,7 @@ class Server(tornado.web.Application):
     self.player.init(self)
     self.library.init()
     self.cloudsyncer.init(self)
+    self.cdburner.init(self)
 
   def raise_client_event(self, message, data='', client=None):
     obj = {
@@ -250,7 +262,7 @@ class Server(tornado.web.Application):
   def run(self):
     port = 8088
     self.listen(port)
-    print '[SERVER] Listening on port %d' % port
+    print "[SERVER] Listening on port %d.. we're now up and running!!" % port
     try:
       tornado.ioloop.IOLoop.instance().start()
     finally:
@@ -270,6 +282,7 @@ class Server(tornado.web.Application):
     def __init__(self, application, request):
       tornado.websocket.WebSocketHandler.__init__(self, application, request)
       self.MESSAGE_HANDLERS = {
+        'burn_cd': self.application.hdl_burn_cd,
         'delete': self.application.hdl_delete,
         'describe_currently_playing': self.application.hdl_describe_currently_playing,
         'describe_queue': self.application.hdl_list_queue,

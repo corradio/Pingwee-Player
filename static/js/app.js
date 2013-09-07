@@ -115,6 +115,9 @@ function MainController($scope, socket, keyboardManager) {
   $scope.player['scan_library'] = function() {
     socket.send('scan_library', '');
   };
+  $scope.player['burn_cd'] = function() {
+    socket.send('burn_cd', '');
+  };
   // This can be put in a Player() constructor
 
 

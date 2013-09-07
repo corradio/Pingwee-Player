@@ -33,3 +33,10 @@ nosetests.xml
 .mr.developer.cfg
 .project
 .pydevproject
+
+# Possible created files
+*.cue
+*.json
+
+# MAC Files
+.DS_Store

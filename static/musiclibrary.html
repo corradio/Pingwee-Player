@@ -13,6 +13,10 @@
       <div id="taglistpanel">
         <div id="taglist">
           <a ng-click="player.scan_library()" href="">[Scan Library{{scan_state}}]</a>
+          <br>
+          <a ng-click="player.burn_cd()" href="">[Burn CD{{burn_state}}]</a>
+          <br>
+          <br>
           <ul id="queue" class="unstyled">
             <li data-ng-repeat="tag in tags">
               <a ng-click="player.play_tag($index)" href="">{{tag}}</a>
@@ -28,7 +32,7 @@
             <i ng-show="($index==currentlyplaying.index) && (player_state=='stop')" class="icon-stop"></i>
             <i ng-show="$index<currentlyplaying.index" class="icon-empty"></i>
             <i ng-show="$index>currentlyplaying.index" class="icon-time"></i>
-            {{track.artist}} - {{track.title}} [{{track.play_counter}}x]
+            {{track.artist}} - {{track.title}} [{{track.play_counter}}x]<span style="bpm">{{track.bpm}}</span>
           </li>
         </ul>
       </div>

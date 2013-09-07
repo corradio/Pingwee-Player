@@ -27,7 +27,7 @@ class Library:
     'play_counter': 'TXXX:PLAY_COUNTER',
     'replaygain_track_gain': 'TXXX:replaygain_track_gain',
     'replaygain_album_gain': 'TXXX:replaygain_album_gain',
-    'bpm': 'bpm',
+    'bpm': 'TBPM',
     'lyrics': 'TXXX:LYRICS',
   }
 
