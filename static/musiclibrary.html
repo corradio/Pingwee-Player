@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html data-ng-app="musikApp" data-ng-controller="MainController">
 <head>
-  <link href="style/style.css" rel="stylesheet" type="text/css"></link>
   <link href="bootstrap/css/bootstrap.min.css" rel="stylesheet" media="screen">
+  <link href="style/style.css" rel="stylesheet" type="text/css"></link>
   </head>
   <body>
     <div class="header row-fluid">
@@ -32,7 +32,12 @@
             <i ng-show="($index==currentlyplaying.index) && (player_state=='stop')" class="icon-stop"></i>
             <i ng-show="$index<currentlyplaying.index" class="icon-empty"></i>
             <i ng-show="$index>currentlyplaying.index" class="icon-time"></i>
-            {{track.artist}} - {{track.title}} [{{track.play_counter}}x]<span style="bpm">{{track.bpm}}</span>
+            <span ng-click="player.select_track($index)">
+              {{track.artist}} - {{track.title}} 
+              <span ng-show="track.player_counter" style="playcounter">[{{track.play_counter}}x]</span>
+              <span ng-show="track.replaygain_track_gain" style="replaygain"><sup>RG</sup></span>
+              <span ng-show="track.bpm" style="bpm"><sup>{{track.bpm}}bpm</sup></span>
+            </span>
           </li>
         </ul>
       </div>
@@ -57,8 +62,8 @@
     <div id="footer row-fluid">
     </div>
 
-    <div id="debugpanel">
-      <pre style="font-size: 0.7em; line-height: 10px; margin: 0px;">{{trackrawdata | json}}</pre>
+    <div id="debugpanel" ng-show="debug">
+      <pre style="font-size: 0.8em; line-height: 10px; margin: 0px;">{{trackrawdata | json}}</pre>
     </div>
 
     <div id="backgroundcontainer" back-img="{{currentlyplaying.cover}}"></div>

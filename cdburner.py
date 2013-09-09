@@ -27,6 +27,8 @@ class CDBurner:
     return True
 
   def burn_cd(self, tracks, trackinfos):
+    # TODO: Save some time by cleaning the CD while making the cue
+
     if not os.path.exists(self.PATH_TO_TEMPFOLDER):
       os.makedirs(self.PATH_TO_TEMPFOLDER)
 
@@ -42,7 +44,6 @@ class CDBurner:
       "-audio",
       "-text",
       "-pad",
-      "-eject",
       "gracetime=0",
       "cuefile=%s" % self.TEMPCUEFILE
     ]

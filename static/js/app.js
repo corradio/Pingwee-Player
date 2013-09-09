@@ -7,6 +7,7 @@ function MainController($scope, socket, keyboardManager) {
   $scope.selected_track_index = 0;
   $scope.tracks = [];
   $scope.scan_state = "";
+  $scope.debug = false;
 
   // Model definition with default values
   $scope.currentlyplaying = {}
@@ -57,6 +58,9 @@ function MainController($scope, socket, keyboardManager) {
   keyboardManager.bind('ctrl+L', function() {
     $scope.selected_track_index = $scope.currentlyplaying.index;
     queue_track_onSelected($scope.currentlyplaying.index);
+  });
+  keyboardManager.bind('D', function() {
+    $scope.debug = !$scope.debug;
   });
 
   // Add sway.fm/api support for media keys
@@ -118,6 +122,10 @@ function MainController($scope, socket, keyboardManager) {
   $scope.player['burn_cd'] = function() {
     socket.send('burn_cd', '');
   };
+  $scope.player['select_track'] = function(index) {
+    $scope.selected_track_index = index;
+    queue_track_onSelected($scope.selected_track_index);
+  }
   // This can be put in a Player() constructor
 
 
