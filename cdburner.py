@@ -8,10 +8,11 @@ class CDBurner:
   
   # TODO: Put this in a configuration file
   PATH_TO_CDRECORD = '/Users/corradio/Downloads/cdrtools-3.01/cdrecord/OBJ/i386-darwin-cc/cdrecord'
+  PATH_TO_MKISOFS = '/Users/corradio/Downloads/cdrtools-3.01/mkisofs/OBJ/i386-darwin-cc/mkisofs'
   PATH_TO_LAME = '/Users/corradio/Documents/Dev/lame'
 
   PATH_TO_TEMPFOLDER = '/Users/corradio/Documents/Dev/musiclibrary/tempburn/'
-  TEMPCUEFILE = PATH_TO_TEMPFOLDER + 'tempburn.cue'
+  TEMPTEXTFILE = PATH_TO_TEMPFOLDER + 'tempburn.dat'
 
   server = None
 
@@ -29,39 +30,61 @@ class CDBurner:
       return False
     return True
 
-  def burn_cd(self, tracks, trackinfos):
-    # TODO: Save some time by cleaning the CD while making the cue
+  def burn_mp3_cd(self, tracks, trackinfos):
+    # TODO: Refactor to burn_data_cd
 
     if not os.path.exists(self.PATH_TO_TEMPFOLDER):
       os.makedirs(self.PATH_TO_TEMPFOLDER)
 
-    # TODO: Check here if an RW is inserted, and clear it, instead of assuming
-    #if not self.blank_cdrw():
-    #  return False
+    # TODO: Check the file format is compatible
+    # TODO: Rename files to make a nice structure? Use symbolic links? Remember to add the necessary flags to mkisofs
+    #       Maybe make a folder by artist?
+    cmd = [
+      self.PATH_TO_MKISOFS,
+      "-J",
+      "-o",
+      self.PATH_TO_TEMPFOLDER + "temp.iso"
+    ] + tracks
 
-    if not self.make_cue(tracks, trackinfos):
+    if subprocess.call(cmd) != 0:
+      print "[BURN] Error creating ISO"
+      return False
+
+    # TODO: Check here if an RW is inserted, and clear it, instead of assuming
+    if not self.blank_cdrw():
+      print "[BURN] Error blanking CDRW"
       return False
 
     cmd = [
       self.PATH_TO_CDRECORD,
-      "-audio",
-      "-text",
-      "-pad",
-      "gracetime=0",
-      "-dao",
-      "cuefile=%s" % self.TEMPCUEFILE
+      self.PATH_TO_TEMPFOLDER + "temp.iso"
     ]
     
     if subprocess.call(cmd) != 0:
       print "[BURN] Error burning CD"
       return False
 
-    #shutil.rmtree(self.PATH_TO_TEMPFOLDER)
-    #print "[BURN] Done!"
+    shutil.rmtree(self.PATH_TO_TEMPFOLDER)
+    print "[BURN] Done!"
 
     return True
 
+  """DEPRECATED
+     There is a problem when burning from CUE files. Works fine if I burn without CUE.
+     Still fails with CUE without TEXT
+     Find a way to create a .dat cdtext file
+  """
   def make_cue(self, tracks, trackinfos):
+    """cmd = [
+      self.PATH_TO_CDRECORD,
+      "-audio",
+      "-text",
+      "-pad",
+      "gracetime=0",
+      "-dao",
+      "textfile=%s" % self.TEMPTEXTFILE
+    ]"""
+
     cdartist = "VA"
     cdtitle = "Pingwee Player Burn"
     cue = 'PERFORMER "%s"\nTITLE "%s"\n' % (cdartist, cdtitle)

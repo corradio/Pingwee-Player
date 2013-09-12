@@ -39,13 +39,22 @@ class Server(tornado.web.Application):
     )
     tornado.web.Application.__init__(self, handlers, **settings)
 
+  def burn_cd(self, tracks, trackinfos):
+    self.cdburner.burn_mp3_cd(tracks, trackinfos)
+    self.raise_client_event('burn_cd_finished')
+
   def hdl_burn_cd(self, socket, data):
     tag = 'Burn'
     map_tag_tracks = self.library.map_tag_tracks
     map_track_info = self.library.map_track_info
     tracks = map_tag_tracks[tag]
     trackinfos = [map_track_info[track] for track in tracks]
-    self.cdburner.burn_cd(tracks, trackinfos)
+
+    #self.cdburner.burn_mp3_cd(tracks, trackinfos)
+    self.raise_client_event('burn_cd_started')
+    thread_scan_library = Thread(target=self.burn_cd, args=(tracks, trackinfos))
+    thread_scan_library.setDaemon(True)
+    thread_scan_library.start()
 
   def hdl_delete(self, socket, data):
     queue = self.player.get_queue()
