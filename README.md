@@ -22,6 +22,10 @@ Communication syntax
 -------------------
 
 To be done
+
+Screenshot
+----------
+![Unavailable](/screenshot.png "Progress August 2013")
   
 Comments
 --------
