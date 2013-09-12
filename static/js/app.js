@@ -102,7 +102,7 @@ function MainController($scope, socket, keyboardManager) {
   }
   unity.sendState(playerState);*/
 
-  // Ideas for the API
+  // Ideas for the API. TODO: generalize
   $scope.player = {}
   $scope.player['play'] = function() {console.log('called');};
   $scope.player.play();

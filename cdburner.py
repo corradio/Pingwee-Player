@@ -1,9 +1,12 @@
+"""Everything that has to do with burning a CD"""
+
 import os
 import shutil
 import subprocess
 
 class CDBurner:
   
+  # TODO: Put this in a configuration file
   PATH_TO_CDRECORD = '/Users/corradio/Downloads/cdrtools-3.01/cdrecord/OBJ/i386-darwin-cc/cdrecord'
   PATH_TO_LAME = '/Users/corradio/Documents/Dev/lame'
 
@@ -33,8 +36,8 @@ class CDBurner:
       os.makedirs(self.PATH_TO_TEMPFOLDER)
 
     # TODO: Check here if an RW is inserted, and clear it, instead of assuming
-    if not self.blank_cdrw():
-      return False
+    #if not self.blank_cdrw():
+    #  return False
 
     if not self.make_cue(tracks, trackinfos):
       return False
@@ -45,6 +48,7 @@ class CDBurner:
       "-text",
       "-pad",
       "gracetime=0",
+      "-dao",
       "cuefile=%s" % self.TEMPCUEFILE
     ]
     
@@ -52,8 +56,8 @@ class CDBurner:
       print "[BURN] Error burning CD"
       return False
 
-    shutil.rmtree(self.PATH_TO_TEMPFOLDER)
-    print "[BURN] Done, and eject!"
+    #shutil.rmtree(self.PATH_TO_TEMPFOLDER)
+    #print "[BURN] Done!"
 
     return True
 
@@ -70,13 +74,24 @@ class CDBurner:
       filepath = os.path.basename(track)
       filename, extension = os.path.splitext(filepath)
       trackformat = 'WAVE'
+
+      title = ''
+      if 'title' in trackinfo:
+        title = trackinfo['title']
+
+      artist = ''
+      if 'artist' in trackinfo:
+        artist = trackinfo['artist']
+
+      print '[BURN] Preparing %d/%d %s' % (tracknum, len(tracks), filename)
+
       if extension.upper() != '.WAV':
         # We need to convert this file first
         tmptrack = self.PATH_TO_TEMPFOLDER + os.path.basename(filename) + '.wav'
-        cmd = [self.PATH_TO_LAME, "--silent", "--decode", track, tmptrack]
-        if subprocess.call(cmd) != 0:
-          print "[BURN] Error while using LAME to convert tracks to WAV: aborting."
-          return False
+        #cmd = [self.PATH_TO_LAME, "--silent", "--decode", track, tmptrack]
+        #if subprocess.call(cmd) != 0:
+        #  print "[BURN] Error while using LAME to convert tracks to WAV: aborting."
+        #  return False
         track = tmptrack
 
       cue = (cue + '\n' +
@@ -84,12 +99,12 @@ class CDBurner:
         '  TRACK %02d AUDIO\n' +
         '    TITLE "%s"\n' +
         '    PERFORMER "%s"\n' +
-        '    INDEX 01 00:00:00') % (track, trackformat, tracknum, trackinfo['title'], trackinfo['artist'])
+        '    INDEX 01 00:00:00') % (track, trackformat, tracknum, title, artist)
 
     # Write CUE
     f = open(self.TEMPCUEFILE, 'w')
     try:
-      f.write(cue)
+      f.write(cue.encode('utf-8'))
     finally:
       f.close()
 

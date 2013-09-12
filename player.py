@@ -1,3 +1,5 @@
+"""Main point of entry. Exposes the websocket, handles inbound and outbound communication."""
+
 import logging
 import mpd
 import os

@@ -1,4 +1,5 @@
 #!/usr/bin/python
+"""EXPERIMENTAL: Auto-fetching covers from the web"""
 
 import base64
 import urllib2
