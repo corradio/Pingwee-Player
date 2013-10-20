@@ -1,9 +1,9 @@
-"""Main point of entry. Exposes the websocket, handles inbound and outbound communication."""
+"""ENTER DESCRIption HERE"""
 
 import logging
 import mpd
 import os
-import osax
+#import osax
 import select
 import time
 
@@ -27,7 +27,8 @@ class LockableMPDClient(mpd.MPDClient):
 
 
 class Player:
-  MPD_ROOT = "/Users/corradio/Music/"
+  # TODO: Compute this programmatically from the library
+  MPD_ROOT = "/Users/olc/Music/"
 
   mpc = LockableMPDClient()
   server = None
@@ -124,7 +125,7 @@ class Player:
     thread_mpd_detect_track_played.setDaemon(True)
     thread_mpd_detect_track_played.start()
 
-    self.appscript = osax.OSAX()
+    #self.appscript = osax.OSAX()
 
   def mpd_detect_track_played(self):
 

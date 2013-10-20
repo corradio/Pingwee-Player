@@ -9,8 +9,8 @@ from dropbox import client, rest, session
 class CloudSyncer:
 
   # TODO: Put this in a configuration file
-  #DROPBOX_PATH = '/Users/corradio/Dropbox/Apps/pingweeplayer/'
-  DROPBOX_PATH = '/Users/corradio/Music/BTSync_music'
+  #DROPBOX_PATH = '/Users/olc/Dropbox/Apps/pingweeplayer/'
+  DROPBOX_PATH = '/Users/olc/Music/BTSync_music'
 
   server = None
   tags_to_sync = ["Hot"]
@@ -24,8 +24,10 @@ class CloudSyncer:
 
   def sync(self):
     # TODO: Here do a sync and not only an add
-
+    return
     for tag in self.tags_to_sync:
+      if not tag in self.server.library.map_tag_tracks:
+        continue
       for filepath in self.server.library.map_tag_tracks[tag]:
         filename = os.path.basename(filepath)
         dst = '%s/%s' % (self.DROPBOX_PATH, filename)

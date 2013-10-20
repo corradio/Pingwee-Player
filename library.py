@@ -58,14 +58,14 @@ class Library:
   EXTENSIONS = ['.MP3', '.FLAC']
 
   LIBRAIRIES = [
-    "/Users/corradio/Music/iTunes/iTunes Media",
-    "/Users/corradio/Music/Logic",
-    "/Users/corradio/Music/Library",
-    "/Users/corradio/Downloads",
+    "/Users/olc/Music/iTunes/iTunes Media",
+    "/Users/olc/Music/Logic",
+    "/Users/olc/Music/Library",
+    "/Users/olc/Downloads",
   ]
 
   PODCAST_DIRECTORIES = [
-    "/Users/corradio/Music/iTunes/iTunes Media/Podcasts"
+    "/Users/olc/Music/iTunes/iTunes Media/Podcasts"
   ]
 
   SPECIAL_TAGS = [
@@ -75,7 +75,7 @@ class Library:
     '!Untagged',
   ]
 
-  TRASH_PATH = '/Users/corradio/.Trash'
+  TRASH_PATH = '/Users/olc/.Trash'
 
   map_tag_tracks = {}
   map_track_info = {}

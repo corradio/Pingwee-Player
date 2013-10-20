@@ -171,6 +171,7 @@ class Server(tornado.web.Application):
     self.library.rename_tag(data['old'], data['new'])
 
   def hdl_scan_library(self, socket, data):
+    # TODO: Wait for the MPD 'database' callback
     self.raise_client_event('scan_library_started')
     thread_scan_library = Thread(target=self.scan_library, args=())
     thread_scan_library.setDaemon(True)
