@@ -62,6 +62,9 @@ function MainController($scope, socket, keyboardManager) {
   keyboardManager.bind('D', function() {
     $scope.debug = !$scope.debug;
   });
+  keyboardManager.bind('R', function() {
+    $scope.player.scan_library();
+  });
 
   // Add sway.fm/api support for media keys
   var unity = UnityMusicShim();
@@ -102,7 +105,7 @@ function MainController($scope, socket, keyboardManager) {
   }
   unity.sendState(playerState);*/
 
-  // Ideas for the API. TODO: generalize
+  // Ideas for the API. TODO(olc): generalize and refactor this part
   $scope.player = {}
   $scope.player['play'] = function() {console.log('called');};
   $scope.player.play();
@@ -195,7 +198,7 @@ function MainController($scope, socket, keyboardManager) {
 
   // Update events
   function queue_track_onSelected(index) {
-    // Use a HashMap here to be able to reference quickly...
+    //TODO(olc) Use a HashMap here to be able to reference quickly...
     if ($scope.tags === undefined || $scope.tracks.length == 0 || $scope.tracks[index] === undefined) { return; }
     var found = false;
     for (var i=0; i<$scope.tags.length; i++) {

@@ -7,11 +7,11 @@ import subprocess
 class CDBurner:
   
   # TODO: Put this in a configuration file
-  PATH_TO_CDRECORD = '/Users/corradio/Downloads/cdrtools-3.01/cdrecord/OBJ/i386-darwin-cc/cdrecord'
-  PATH_TO_MKISOFS = '/Users/corradio/Downloads/cdrtools-3.01/mkisofs/OBJ/i386-darwin-cc/mkisofs'
-  PATH_TO_LAME = '/Users/corradio/Documents/Dev/lame'
+  PATH_TO_CDRECORD = '/Users/olc/dev/musiclibrary/bin/cdrecord'
+  PATH_TO_MKISOFS = '/Users/olc/dev/musiclibrary/bin/mkisofs'
+  PATH_TO_LAME = '/Users/olc/dev/musiclibrary/bin/lame'
 
-  PATH_TO_TEMPFOLDER = '/Users/corradio/Documents/Dev/musiclibrary/tempburn/'
+  PATH_TO_TEMPFOLDER = '/Users/olc/dev/musiclibrary/tempburn/'
   TEMPTEXTFILE = PATH_TO_TEMPFOLDER + 'tempburn.dat'
 
   server = None

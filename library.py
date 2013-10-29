@@ -53,7 +53,7 @@ class Library:
   ]
 
   DATETIME_TAG_FORMAT = '%Y-%m-%d %H:%M:%S'
-  DATABASE_FILENAME = 'database.json'
+  DATABASE_FILENAME = '/Users/olc/dev/musiclibrary/database.json'
 
   EXTENSIONS = ['.MP3', '.FLAC']
 
