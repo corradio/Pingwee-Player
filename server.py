@@ -88,6 +88,8 @@ class Server(tornado.web.Application):
     if 'track' in data:
       track = data['track']
     elif 'QueueIndex' in data:
+      if data['QueueIndex'] == "":
+        return
       track = self.player.get_queue()['Tracks'][data['QueueIndex']]
 
     obj = {
@@ -229,6 +231,8 @@ class Server(tornado.web.Application):
       i = queue['QueueIndexOfCurrentlyPlaying']
       data['track'] = queue['Tracks'][i]
     if (self.library.tag_track(data['track'], data['tag'])):
+      if data['tag'] in self.cloudsyncer.get_watched_tags():
+        self.cloudsyncer.sync()
       # Broadcast to all clients that the taglist has changed
       self.hdl_list_tags(None, None)
       # Broadcast to all clients that the queue has changed

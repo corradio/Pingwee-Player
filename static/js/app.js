@@ -189,7 +189,7 @@ function MainController($scope, socket, keyboardManager) {
         'is_special': $scope.tags[i][0] == '!',
         'onClick': function(event, index) {
           var tag = $scope.selectedtrack_taglist[index];
-          socket.send(tag.checked ? 'tag_track':'untag_track',
+          socket.send(tag.checked ? 'untag_track':'tag_track',
             {
               tag: tag.name,
               track: $scope.trackIDs[$scope.selected_track_index]
