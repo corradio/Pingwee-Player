@@ -202,22 +202,19 @@ class Server(tornado.web.Application):
     self.hdl_get_coverart(socket=None, data={'track': track})
 
   def hdl_set_track_info(self, socket, data):
-    if 'track' not in data:
-      # Assume the currently playing track is targetted
-      queue = self.player.get_queue()
-      i = queue['QueueIndexOfCurrentlyPlaying']
-      data['track'] = queue['Tracks'][i]
+    ID = data['ID'] if 'ID' in data.keys() else data['track']
     for field in data.keys():
-      if field == 'track':
+      if field == 'track' or field == 'ID' or field[0] == '$':
         continue
       else:
         self.library.write_field(
-          data['track'],
+          ID,
           field,
           data[field],
           True
         )
     self.library.save_database()
+    self.hdl_list_queue(None, None)
 
   def hdl_stop(self, socket, data):
     self.player.stop()

@@ -63,7 +63,8 @@
     </div>
 
     <div id="debugpanel" ng-show="debug">
-      <pre style="font-size: 0.8em; line-height: 10px; margin: 0px;">{{trackrawdata | json}}</pre>
+      <pre ng-show="!edit" style="font-size: 0.8em; line-height: 10px; margin: 0px;">{{trackrawdata | json}}</pre>
+      <textarea id="edittextarea" ng-show="edit" style="width:700px; height:200px" ng-model="trackrawdata_stringified"></textarea>
     </div>
 
     <div id="backgroundcontainer" back-img="{{currentlyplaying.cover}}"></div>

@@ -8,6 +8,7 @@ function MainController($scope, socket, keyboardManager) {
   $scope.tracks = [];
   $scope.scan_state = "";
   $scope.debug = false;
+  $scope.edit = false;
 
   // Model definition with default values
   $scope.currentlyplaying = {}
@@ -61,6 +62,14 @@ function MainController($scope, socket, keyboardManager) {
   });
   keyboardManager.bind('D', function() {
     $scope.debug = !$scope.debug;
+  });
+  keyboardManager.bind('E', function() {
+    $scope.edit = true;
+    $scope.debug = true;
+  });
+  keyboardManager.bind('meta+enter', function() {
+    $scope.edit = false;
+    $scope.player.saveEdit();
   });
   keyboardManager.bind('R', function() {
     $scope.player.scan_library();
@@ -128,6 +137,9 @@ function MainController($scope, socket, keyboardManager) {
   $scope.player['select_track'] = function(index) {
     $scope.selected_track_index = index;
     queue_track_onSelected($scope.selected_track_index);
+  }
+  $scope.player['saveEdit'] = function() {
+    socket.send('set_track_info', JSON.parse($scope.trackrawdata_stringified));
   }
   // This can be put in a Player() constructor
 
@@ -226,6 +238,7 @@ function MainController($scope, socket, keyboardManager) {
     // Update raw data
     $scope.trackrawdata = $scope.tracks[$scope.selected_track_index];
     $scope.trackrawdata['ID'] = $scope.trackIDs[$scope.selected_track_index];
+    $scope.trackrawdata_stringified = JSON.stringify($scope.trackrawdata);
   }
 
   $scope.tag_onAdd = function() {

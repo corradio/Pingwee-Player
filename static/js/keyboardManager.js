@@ -29,7 +29,8 @@ app.factory('keyboardManager', ['$window', '$timeout', function ($window, $timeo
         if (e.target) elt = e.target;
         else if (e.srcElement) elt = e.srcElement;
         if (elt.nodeType == 3) elt = elt.parentNode;
-        if (elt.tagName == 'INPUT' || elt.tagName == 'TEXTAREA') return;
+        if (!e.metaKey)
+          if (elt.tagName == 'INPUT' || elt.tagName == 'TEXTAREA') return;
       }
 
       // Find out which key is pressed
