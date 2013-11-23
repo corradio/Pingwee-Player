@@ -10,6 +10,7 @@ class CDBurner:
   PATH_TO_CDRECORD = '/Users/olc/dev/musiclibrary/bin/cdrecord'
   PATH_TO_MKISOFS = '/Users/olc/dev/musiclibrary/bin/mkisofs'
   PATH_TO_LAME = '/Users/olc/dev/musiclibrary/bin/lame'
+  PATH_TO_MP3GAIN =  '%s %s' % (os.path.join(os.path.dirname(__file__), 'bin/mp3gain'), '-r -q'),
 
   PATH_TO_TEMPFOLDER = '/Users/olc/dev/musiclibrary/tempburn/'
   TEMPTEXTFILE = PATH_TO_TEMPFOLDER + 'tempburn.dat'
@@ -36,9 +37,27 @@ class CDBurner:
     if not os.path.exists(self.PATH_TO_TEMPFOLDER):
       os.makedirs(self.PATH_TO_TEMPFOLDER)
 
+    # Copy and rename all tracks in the temp dir
+    for i in range(len(tracks)):
+      track = tracks[i]
+      info = trackinfos[i]
+      if 'artist' in info and 'title' in info:
+        unused, fileext = os.path.splitext(track)
+        parent = os.path.dirname(track)
+        filename = os.path.basename(track)
+        if 'bpm' in info:
+          newname = '%s %s - %s%s' % (info['bpm'], info['artist'], info['title'], fileext)
+        else:
+          newname = '%s - %s%s' % (info['artist'], info['title'], fileext)
+        print 'Processing %s' % os.path.join(parent, newname)
+        newtrack = os.path.join(self.PATH_TO_TEMPFOLDER, newname)
+        shutil.copyfile(track, newtrack)
+        os.call('%s "%s"' % (PATH_TO_MP3GAIN, newtrack), shell=True)
+        tracks[i] = newtrack
+
     # TODO: Check the file format is compatible
-    # TODO: Rename files to make a nice structure? Use symbolic links? Remember to add the necessary flags to mkisofs
-    #       Maybe make a folder by artist?
+    # Remember to add the necessary flags to mkisofs
+    #       Maybe make a folder by artist? or by BPM range?
     cmd = [
       self.PATH_TO_MKISOFS,
       "-J",

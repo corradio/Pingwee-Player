@@ -3,14 +3,15 @@
 import json
 import os
 import mutagen.id3
+import sys
 import traceback
 
 from datetime import datetime
-from mutagen.id3 import ID3, TXXX, ID3NoHeaderError
+from mutagen.apev2 import APEv2
 from mutagen.flac import FLAC
+from mutagen.id3 import ID3, TXXX, ID3NoHeaderError
 from mutagen.mp3 import MP3
-
-
+from subprocess import call
 
 class Library:
 
@@ -46,6 +47,11 @@ class Library:
     'replaygain_album_gain': 'replaygain_album_gain',
     'bpm': 'bpm',
     'lyrics': 'lyrics',
+  }
+
+  MAP_REPLAYGAIN_BIN = {
+    '.FLAC': 'metaflac --add-replay-gain',
+    '.MP3': '%s %s' % (os.path.join(os.path.dirname(__file__), 'bin/mp3gain'), '-p -q -s i'),
   }
 
   MULTILINE_FIELDS = [
@@ -160,32 +166,33 @@ class Library:
     filename, extension = os.path.splitext(file)
     info = {}
 
-    try:
-      if extension.upper() == '.MP3':
-        audio = ID3(file)
-        MAP_FIELDS = self.MAP_ID3_FIELDS
-      elif extension.upper() == '.FLAC':
-        audio = FLAC(file)
-        MAP_FIELDS = self.MAP_FLAC_FIELDS
-
+    def read_info(audio, MAP_FIELDS):
       for field in MAP_FIELDS.keys():
         if MAP_FIELDS[field] in audio.keys():
-          if extension.upper() == '.MP3':
+          if audio.__class__ == mutagen.id3.ID3:
             data = UTF8Encode(audio[MAP_FIELDS[field]].text)
-          elif extension.upper() == '.FLAC':
+          elif audio.__class__ == mutagen.flac.FLAC:
             data = UTF8Encode(audio[MAP_FIELDS[field]])
-          if field not in self.MULTILINE_FIELDS:
-            info[field] = ';'.join(data)
-          else:
+          elif audio.__class__ == mutagen.apev2.APEv2:
+            data = UTF8Encode(str(audio[MAP_FIELDS[field]]))
+          # Flatten everything which is not multiline
+          if field in self.MULTILINE_FIELDS:
             if not isinstance(data, list):
               data = [data]
-            info[field] = data
+          elif isinstance(data, list):
+            data = ';'.join(data)
+          info[field] = data
 
-      #cover = self.get_track_coverart(file)
-      #if cover:
-      #  info['cover'] = cover
-    except mutagen.id3.ID3NoHeaderError:
-      print 'Warning: No ID3 header found in file %s' % file
+    if extension.upper() == '.MP3':
+      try:
+        audio = ID3(file)
+        read_info(audio, self.MAP_ID3_FIELDS)
+      except mutagen.id3.ID3NoHeaderError:
+        print 'Warning: No ID3 header found in file %s' % file
+    elif extension.upper() == '.FLAC':
+      audio = FLAC(file)
+      read_info(audio, self.MAP_FLAC_FIELDS)
+
     return info
 
   def init(self):
@@ -251,7 +258,8 @@ class Library:
                 # Remember that writing here will update the current DB, but not the temporary one we are creating here
                 temp_map_track_info[file]['first_added'] = first_added
                 print 'Welcome to the library %s' % file
-              if (datetime.now() - datetime.strptime(temp_map_track_info[file]['first_added'], self.DATETIME_TAG_FORMAT)).days <= 60:
+              if (datetime.now() - datetime.strptime(temp_map_track_info[file]['first_added'],
+                                                     self.DATETIME_TAG_FORMAT)).days <= 90:
                   temp_map_tag_tracks['!RecentlyAdded'] += [file]
 
               # !NeverPlayed
@@ -264,9 +272,9 @@ class Library:
 
               # ReplayGain support
               if not 'replaygain_track_gain' in temp_map_track_info[file]:
-                print 'No RG. For FLAC, call metaflac --add-replay-gain [file]. Figure it out for MP3s. Then remember to update the library.'
+                call('%s "%s"' % (self.MAP_REPLAYGAIN_BIN[ext.upper()], file), shell=True)
                 # Re-read tags
-                #temp_map_track_info[file] = self.get_track_info(file)
+                temp_map_track_info[file] = self.get_track_info(file)
 
             except Exception, e:
               traceback.print_exc()
