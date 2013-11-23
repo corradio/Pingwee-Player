@@ -37,7 +37,7 @@ public class Model {
 
     public Model(MainActivity mainActivity) {
         this.mainActivity = mainActivity;
-        this.ws = new WebSocketClient("ws://192.168.1.15:8088/websocket", new Handler(Looper.getMainLooper(), this), this);
+        this.ws = new WebSocketClient("ws://192.168.1.6:8088/websocket", new Handler(Looper.getMainLooper(), this), this);
 
         this.btnPlay = (Button) mainActivity.findViewById(R.id.button);
         this.tTrackInfo = (TextView) mainActivity.findViewById(R.id.textView);
