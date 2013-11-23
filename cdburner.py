@@ -7,12 +7,12 @@ import subprocess
 class CDBurner:
   
   # TODO: Put this in a configuration file
-  PATH_TO_CDRECORD = '/Users/olc/dev/musiclibrary/bin/cdrecord'
-  PATH_TO_MKISOFS = '/Users/olc/dev/musiclibrary/bin/mkisofs'
-  PATH_TO_LAME = '/Users/olc/dev/musiclibrary/bin/lame'
+  PATH_TO_CDRECORD = '/Users/olc/dev/pingweeplayer/bin/cdrecord'
+  PATH_TO_MKISOFS = '/Users/olc/dev/pingweeplayer/bin/mkisofs'
+  PATH_TO_LAME = '/Users/olc/dev/pingweeplayer/bin/lame'
   PATH_TO_MP3GAIN =  '%s %s' % (os.path.join(os.path.dirname(__file__), 'bin/mp3gain'), '-r -q'),
 
-  PATH_TO_TEMPFOLDER = '/Users/olc/dev/musiclibrary/tempburn/'
+  PATH_TO_TEMPFOLDER = '/Users/olc/dev/pingweeplayer/tempburn/'
   TEMPTEXTFILE = PATH_TO_TEMPFOLDER + 'tempburn.dat'
 
   server = None

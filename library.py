@@ -16,6 +16,7 @@ from subprocess import call
 class Library:
 
   MAP_ID3_FIELDS = {
+    'bpm': 'TBPM',
     'tags': 'TXXX:TAG',
     'album': 'TALB',
     'artist': 'TPE1',
@@ -28,11 +29,12 @@ class Library:
     'play_counter': 'TXXX:PLAY_COUNTER',
     'replaygain_track_gain': 'TXXX:replaygain_track_gain',
     'replaygain_album_gain': 'TXXX:replaygain_album_gain',
-    'bpm': 'TBPM',
+    'mp3gain': 'TXXX:MP3GAIN_MINMAX',
     'lyrics': 'TXXX:LYRICS',
   }
 
   MAP_FLAC_FIELDS = {
+    'bpm': 'bpm',
     'tags': 'tag',
     'album': 'album',
     'artist': 'artist',
@@ -45,7 +47,6 @@ class Library:
     'play_counter': 'play_counter',
     'replaygain_track_gain': 'replaygain_track_gain',
     'replaygain_album_gain': 'replaygain_album_gain',
-    'bpm': 'bpm',
     'lyrics': 'lyrics',
   }
 
@@ -71,7 +72,9 @@ class Library:
   ]
 
   PODCAST_DIRECTORIES = [
-    "/Users/olc/Music/iTunes/iTunes Media/Podcasts"
+    "/Users/olc/Music/iTunes/iTunes Media/Podcasts",
+    "/Users/olc/Music/iTunes/iTunes Media/Recordings",
+    "/Users/olc/Music/iTunes/iTunes Media/Mixes",
   ]
 
   SPECIAL_TAGS = [
@@ -173,8 +176,6 @@ class Library:
             data = UTF8Encode(audio[MAP_FIELDS[field]].text)
           elif audio.__class__ == mutagen.flac.FLAC:
             data = UTF8Encode(audio[MAP_FIELDS[field]])
-          elif audio.__class__ == mutagen.apev2.APEv2:
-            data = UTF8Encode(str(audio[MAP_FIELDS[field]]))
           # Flatten everything which is not multiline
           if field in self.MULTILINE_FIELDS:
             if not isinstance(data, list):
@@ -250,6 +251,7 @@ class Library:
                     temp_map_tag_tracks[tag] = [file]
               else:
                 temp_map_tag_tracks['!Untagged'] += [file]
+                temp_map_track_info[file]['tags'] = []
 
               # !RecentlyAdded
               if not 'first_added' in temp_map_track_info[file]:
@@ -271,7 +273,9 @@ class Library:
                 temp_map_tag_tracks['!Podcast'] += [file]
 
               # ReplayGain support
-              if not 'replaygain_track_gain' in temp_map_track_info[file]:
+              if (not 'replaygain_track_gain' in temp_map_track_info[file] 
+                and not 'mp3gain' in temp_map_track_info[file]
+                and not file in temp_map_tag_tracks['!Podcast']):
                 call('%s "%s"' % (self.MAP_REPLAYGAIN_BIN[ext.upper()], file), shell=True)
                 # Re-read tags
                 temp_map_track_info[file] = self.get_track_info(file)
