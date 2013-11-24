@@ -4,13 +4,15 @@ import os
 import shutil
 import subprocess
 
+from subprocess import call
+
 class CDBurner:
   
   # TODO: Put this in a configuration file
   PATH_TO_CDRECORD = '/Users/olc/dev/pingweeplayer/bin/cdrecord'
   PATH_TO_MKISOFS = '/Users/olc/dev/pingweeplayer/bin/mkisofs'
   PATH_TO_LAME = '/Users/olc/dev/pingweeplayer/bin/lame'
-  PATH_TO_MP3GAIN =  '%s %s' % (os.path.join(os.path.dirname(__file__), 'bin/mp3gain'), '-r -q'),
+  PATH_TO_MP3GAIN =  '%s %s' % (os.path.join(os.path.dirname(__file__), 'bin/mp3gain'), '-r -q')
 
   PATH_TO_TEMPFOLDER = '/Users/olc/dev/pingweeplayer/tempburn/'
   TEMPTEXTFILE = PATH_TO_TEMPFOLDER + 'tempburn.dat'
@@ -38,6 +40,7 @@ class CDBurner:
       os.makedirs(self.PATH_TO_TEMPFOLDER)
 
     # Copy and rename all tracks in the temp dir
+    tmptracks = []
     for i in range(len(tracks)):
       track = tracks[i]
       info = trackinfos[i]
@@ -51,9 +54,11 @@ class CDBurner:
           newname = '%s - %s%s' % (info['artist'], info['title'], fileext)
         print 'Processing %s' % os.path.join(parent, newname)
         newtrack = os.path.join(self.PATH_TO_TEMPFOLDER, newname)
-        shutil.copyfile(track, newtrack)
-        os.call('%s "%s"' % (PATH_TO_MP3GAIN, newtrack), shell=True)
-        tracks[i] = newtrack
+        if not os.path.exists(newtrack):
+          shutil.copyfile(track, newtrack)
+          cmd = '%s "%s"' % (self.PATH_TO_MP3GAIN, newtrack)
+          call(cmd, shell=True)
+        tmptracks.append(newtrack)
 
     # TODO: Check the file format is compatible
     # Remember to add the necessary flags to mkisofs
@@ -61,9 +66,11 @@ class CDBurner:
     cmd = [
       self.PATH_TO_MKISOFS,
       "-J",
+      "-R",
+      "-joliet-long",
       "-o",
       self.PATH_TO_TEMPFOLDER + "temp.iso"
-    ] + tracks
+    ] + tmptracks
 
     if subprocess.call(cmd) != 0:
       print "[BURN] Error creating ISO"

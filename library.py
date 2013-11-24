@@ -60,7 +60,7 @@ class Library:
   ]
 
   DATETIME_TAG_FORMAT = '%Y-%m-%d %H:%M:%S'
-  DATABASE_FILENAME = '/Users/olc/dev/musiclibrary/database.json'
+  DATABASE_FILENAME = os.path.join(os.path.dirname(__file__), 'database.json')
 
   EXTENSIONS = ['.MP3', '.FLAC']
 
@@ -75,6 +75,7 @@ class Library:
     "/Users/olc/Music/iTunes/iTunes Media/Podcasts",
     "/Users/olc/Music/iTunes/iTunes Media/Recordings",
     "/Users/olc/Music/iTunes/iTunes Media/Mixes",
+    "/Users/olc/Music/Library/TOU",
   ]
 
   SPECIAL_TAGS = [
