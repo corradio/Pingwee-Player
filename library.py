@@ -216,7 +216,7 @@ class Library:
       pass
     # Start watchdog
     for library in self.LIBRAIRIES:
-      watchdog = Thread(target=self.watch_library, args=(library))
+      watchdog = Thread(target=self.watch_dir, args=(library,))
       watchdog.setDaemon(True)
       watchdog.start()
 
@@ -379,16 +379,16 @@ class Library:
     # Save
     self.save_database()
 
-  def watch_library(self, library):
-    d = Dir(library)
+  def watch_dir(self, dirpath):
+    d = Dir(dirpath)
     ref = DirState(d)
     while (True):
-      time.sleep(WATCHDOG_POLL_PERIOD_SECONDS)
+      time.sleep(self.WATCHDOG_POLL_PERIOD_SECONDS)
       new = DirState(d)
       diff = new - ref
       for file_added in diff['created']:
         print '[LIBRARY] Watchdog detected a new file: %s' % file_added
-        self.scan_file(map_tag_tracks, map_track_info, library, file_added)
+        self.scan_file(map_tag_tracks, map_track_info, dirpath, file_added)
       ref = new
 
 
