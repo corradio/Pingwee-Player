@@ -4,14 +4,17 @@ import json
 import os
 import mutagen.id3
 import sys
+import time
 import traceback
 
 from datetime import datetime
+from dirtools import Dir, DirState
 from mutagen.apev2 import APEv2
 from mutagen.flac import FLAC
 from mutagen.id3 import ID3, TXXX, ID3NoHeaderError
 from mutagen.mp3 import MP3
 from subprocess import call
+from threading import Thread
 
 class Library:
 
@@ -86,6 +89,8 @@ class Library:
   ]
 
   TRASH_PATH = '/Users/olc/.Trash'
+
+  WATCHDOG_POLL_PERIOD_SECONDS = 60
 
   map_tag_tracks = {}
   map_track_info = {}
@@ -208,6 +213,11 @@ class Library:
       print '[LIBRARY] Database read from file'
     except IOError:
       pass
+    # Start watchdog
+    for library in self.LIBRAIRIES:
+      watchdog = Thread(target=self.watch_library, args=(library))
+      watchdog.setDaemon(True)
+      watchdog.start()
 
   def mark_track_played(self, file):
     info = self.map_track_info[file]
@@ -225,6 +235,57 @@ class Library:
       }
     )
 
+  def scan_file(self, temp_map_tag_tracks, temp_map_track_info, dirname, filename):
+    file = unicode(os.path.join(dirname, filename), 'utf8')
+    unused, ext = os.path.splitext(filename)
+    if ext.upper() in self.EXTENSIONS:
+      try:
+        temp_map_track_info[file] = self.get_track_info(file)
+        if 'tags' in temp_map_track_info[file]:
+          tags = temp_map_track_info[file]['tags']
+          if len(tags) == 0:
+            temp_map_tag_tracks['!Untagged'] += [file]
+          for tag in tags:
+            if tag in temp_map_tag_tracks:
+              temp_map_tag_tracks[tag] += [file]
+            else:
+              temp_map_tag_tracks[tag] = [file]
+        else:
+          temp_map_tag_tracks['!Untagged'] += [file]
+          temp_map_track_info[file]['tags'] = []
+
+        # !RecentlyAdded
+        if not 'first_added' in temp_map_track_info[file]:
+          first_added = datetime.now().strftime(self.DATETIME_TAG_FORMAT)
+          self.write_field(file, 'first_added', first_added, True)
+          # Remember that writing here will update the current DB, but not the temporary one we are creating here
+          temp_map_track_info[file]['first_added'] = first_added
+          print 'Welcome to the library %s' % file
+        if (datetime.now() - datetime.strptime(temp_map_track_info[file]['first_added'],
+                                               self.DATETIME_TAG_FORMAT)).days <= 90:
+            temp_map_tag_tracks['!RecentlyAdded'] += [file]
+
+        # !NeverPlayed
+        if not 'play_counter' in temp_map_track_info[file]:
+          temp_map_tag_tracks['!NeverPlayed'] += [file]
+
+        # !Podcast
+        if any([x in os.path.join(dirname, '') for x in self.PODCAST_DIRECTORIES]):
+          temp_map_tag_tracks['!Podcast'] += [file]
+
+        # ReplayGain support
+        if (not 'replaygain_track_gain' in temp_map_track_info[file] 
+          and not 'mp3gain' in temp_map_track_info[file]
+          and not file in temp_map_tag_tracks['!Podcast']):
+          call('%s "%s"' % (self.MAP_REPLAYGAIN_BIN[ext.upper()], file), shell=True)
+          # Re-read tags
+          temp_map_track_info[file] = self.get_track_info(file)
+
+      except Exception, e:
+        traceback.print_exc()
+    elif ext.upper() in ['.WAV', '.OGG']:
+      print '[LIBRARY] Unsupported %s format %s' % (ext.upper(), file)
+
   def scan_library(self):
     temp_map_tag_tracks = {}
     temp_map_track_info = {}
@@ -236,55 +297,7 @@ class Library:
       for dirname, dirnames, filenames in os.walk(library):
         #print 'Scanning %s' % dirname
         for filename in filenames:
-          file = unicode(os.path.join(dirname, filename), 'utf8')
-          unused, ext = os.path.splitext(filename)
-          if ext.upper() in self.EXTENSIONS:
-            try:
-              temp_map_track_info[file] = self.get_track_info(file)
-              if 'tags' in temp_map_track_info[file]:
-                tags = temp_map_track_info[file]['tags']
-                if len(tags) == 0:
-                  temp_map_tag_tracks['!Untagged'] += [file]
-                for tag in tags:
-                  if tag in temp_map_tag_tracks:
-                    temp_map_tag_tracks[tag] += [file]
-                  else:
-                    temp_map_tag_tracks[tag] = [file]
-              else:
-                temp_map_tag_tracks['!Untagged'] += [file]
-                temp_map_track_info[file]['tags'] = []
-
-              # !RecentlyAdded
-              if not 'first_added' in temp_map_track_info[file]:
-                first_added = datetime.now().strftime(self.DATETIME_TAG_FORMAT)
-                self.write_field(file, 'first_added', first_added, True)
-                # Remember that writing here will update the current DB, but not the temporary one we are creating here
-                temp_map_track_info[file]['first_added'] = first_added
-                print 'Welcome to the library %s' % file
-              if (datetime.now() - datetime.strptime(temp_map_track_info[file]['first_added'],
-                                                     self.DATETIME_TAG_FORMAT)).days <= 90:
-                  temp_map_tag_tracks['!RecentlyAdded'] += [file]
-
-              # !NeverPlayed
-              if not 'play_counter' in temp_map_track_info[file]:
-                temp_map_tag_tracks['!NeverPlayed'] += [file]
-
-              # !Podcast
-              if any([x in os.path.join(dirname, '') for x in self.PODCAST_DIRECTORIES]):
-                temp_map_tag_tracks['!Podcast'] += [file]
-
-              # ReplayGain support
-              if (not 'replaygain_track_gain' in temp_map_track_info[file] 
-                and not 'mp3gain' in temp_map_track_info[file]
-                and not file in temp_map_tag_tracks['!Podcast']):
-                call('%s "%s"' % (self.MAP_REPLAYGAIN_BIN[ext.upper()], file), shell=True)
-                # Re-read tags
-                temp_map_track_info[file] = self.get_track_info(file)
-
-            except Exception, e:
-              traceback.print_exc()
-          elif ext.upper() in ['.WAV', '.OGG']:
-            print '[LIBRARY] Unsupported %s format %s' % (ext.upper(), file)
+          scan_file(temp_map_tag_tracks, temp_map_track_info, dirname, filename)
 
     # Postprocessing begins
 
@@ -364,6 +377,19 @@ class Library:
       del self.map_tag_tracks[tag]
     # Save
     self.save_database()
+
+  def watch_library(self, library):
+    d = Dir(library)
+    ref = DirState(d)
+    while (True):
+      time.sleep(WATCHDOG_POLL_PERIOD_SECONDS)
+      new = DirState(d)
+      diff = new - ref
+      for file_added in diff['created']:
+        print '[LIBRARY] Watchdog detected a new file: %s' % file_added
+        self.scan_file(map_tag_tracks, map_track_info, library, file_added)
+      ref = new
+
 
   def write_fields(self, file, dictkeyvalues, bypassdbwrite=False):
     for key in dictkeyvalues.keys():
