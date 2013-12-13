@@ -245,6 +245,8 @@ class Server(tornado.web.Application):
       i = queue['QueueIndexOfCurrentlyPlaying']
       data['track'] = queue['Tracks'][i]
     self.library.untag_track(data['track'], data['tag'])
+    if data['tag'] in self.cloudsyncer.get_watched_tags():
+      self.cloudsyncer.remove_file(data['track'])
     # Broadcast to all clients that the taglist has changed
     self.hdl_list_tags(None, None)
     # Broadcast to all clients that the queue has changed

@@ -20,6 +20,11 @@ class CloudSyncer:
   def get_watched_tags(self):
     return [self.TAG_TO_SYNC]
 
+  def remove_file(self, file):
+    filename = os.path.basename(file)
+    dst = os.path.join(self.CLOUD_PATH, filename)
+    os.path.remove(file)
+
   def sync(self):
     # TODO(olc)The idea here is to read a changelog.json file, and then taking action on playcounts...
     print "[CLOUDSYNCER] Warning: file names must be uniques. Use some method to check that it holds."

@@ -22,6 +22,7 @@ class Library:
     'artist': 'TPE1',
     'title': 'TIT2',
     'date': 'TDRC',
+    'key': 'TKEY',
     'tracknumber': 'TRCK',
     'first_played': 'TXXX:FIRST_PLAYED',
     'first_added': 'TXXX:FIRST_ADDED',
