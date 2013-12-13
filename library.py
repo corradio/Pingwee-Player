@@ -96,7 +96,7 @@ class Library:
   map_tag_tracks = {}
   map_track_info = {}
 
-  def delete(self, track):
+  def delete(self, track, IOremoval=True):
     # Library removal
     if 'tags' in self.map_track_info[track]:
       for tag in self.map_track_info[track]['tags']:
@@ -105,11 +105,11 @@ class Library:
           del self.map_tag_tracks[tag]
     del self.map_track_info[track]
     # IO removal
-    #os.remove(track)
-    os.rename(track, os.path.join(self.TRASH_PATH, os.path.basename(track)))
+    if IOremoval:
+      os.rename(track, os.path.join(self.TRASH_PATH, os.path.basename(track)))
+      print "[LIBRARY] Track moved to trash: %s" % track
     # Save
     self.save_database()
-    print "[LIBRARY] Track moved to trash: %s" % track
 
   def get_track_coverart(self, file):
     def try_fetch_from_filesystem():
@@ -298,7 +298,7 @@ class Library:
       for dirname, dirnames, filenames in os.walk(library):
         #print 'Scanning %s' % dirname
         for filename in filenames:
-          scan_file(temp_map_tag_tracks, temp_map_track_info, dirname, filename)
+          self.scan_file(temp_map_tag_tracks, temp_map_track_info, dirname, filename)
 
     # Postprocessing begins
 
@@ -368,7 +368,13 @@ class Library:
     return True
 
   def untag_track(self, track, tag):
+    if not track in self.map_track_info:
+      print '[LIBRARY] Error: Could not untag track %s because it does not exist.' % track
+      return False
     tags = self.map_track_info[track]['tags']
+    if not tag in tags:
+      print '[LIBRARY] Warning: Could not untag from track %s because it was not previously tagged as "%s".' % (track, tag)
+      return True
     tags.remove(tag)
     self.write_field(track, 'tags', tags, bypassdbwrite=True)
     # Remove track from tag list
@@ -378,6 +384,7 @@ class Library:
       del self.map_tag_tracks[tag]
     # Save
     self.save_database()
+    return True
 
   def watch_dir(self, dirpath):
     d = Dir(dirpath)
@@ -388,7 +395,10 @@ class Library:
       diff = new - ref
       for file_added in diff['created']:
         print '[LIBRARY] Watchdog detected a new file: %s' % file_added
-        self.scan_file(map_tag_tracks, map_track_info, dirpath, file_added)
+        self.scan_file(self.map_tag_tracks, self.map_track_info, dirpath, file_added)
+      for file_deleted in diff['deleted']:
+        print '[LIBRARY] Watchdog detected deletion of %s' % file_deleted
+        self.delete(os.path.join(dirpath,file_deleted), IOremoval=False)
       ref = new
 
 

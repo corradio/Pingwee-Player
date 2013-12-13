@@ -41,7 +41,7 @@ class CloudSyncer:
         for track in local_db['Tracks']:
           filename = os.path.basename(track)
           if not filename in filenames:
-            print "%s was removed from cloud. Untagging this one." % filename
+            print "[CLOUDSYNCER] %s was removed from cloud. Untagging this one." % filename
             self.server.library.untag_track(track, self.TAG_TO_SYNC)
 
     # Extract server db
@@ -60,6 +60,9 @@ class CloudSyncer:
     for filepath in tracks:
       filename = os.path.basename(filepath)
       dst = os.path.join(self.CLOUD_PATH, filename)
+      if not os.path.exists(filepath):
+        print "[CLOUDSYNCER] Skipping %s as it does not exist. Please update library." % filepath
+        continue
       if not os.path.exists(dst):
         shutil.copy(filepath, dst)
 
@@ -68,3 +71,5 @@ class CloudSyncer:
     f = open(self.DB_FILE, 'w')
     f.write(data)
     f.close()
+
+    print "[CLOUDSYNCER] Files synced."
