@@ -52,9 +52,9 @@ class Server(tornado.web.Application):
 
     #self.cdburner.burn_mp3_cd(tracks, trackinfos)
     self.raise_client_event('burn_cd_started')
-    thread_scan_library = Thread(target=self.burn_cd, args=(tracks, trackinfos))
-    thread_scan_library.setDaemon(True)
-    thread_scan_library.start()
+    thread = Thread(target=self.burn_cd, args=(tracks, trackinfos))
+    thread.setDaemon(True)
+    thread.start()
 
   def hdl_delete(self, socket, data):
     queue = self.player.get_queue()
@@ -254,7 +254,7 @@ class Server(tornado.web.Application):
 
   def init(self):
     self.player.init(self)
-    self.library.init()
+    self.library.init(self)
     self.cloudsyncer.init(self)
     self.cdburner.init(self)
 
@@ -282,7 +282,6 @@ class Server(tornado.web.Application):
       self.player.quit()
 
   def scan_library(self):
-    self.player.update_library()
     self.library.scan_library()
     self.raise_client_event('scan_library_finished')
 

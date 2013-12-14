@@ -72,7 +72,6 @@ class Library:
     "/Users/olc/Music/iTunes/iTunes Media",
     "/Users/olc/Music/Logic",
     "/Users/olc/Music/Library",
-    "/Users/olc/Downloads",
   ]
 
   PODCAST_DIRECTORIES = [
@@ -96,10 +95,20 @@ class Library:
   map_tag_tracks = {}
   map_track_info = {}
 
+  server = None
+
   def delete(self, track, IOremoval=True):
+    unused, ext = os.path.splitext(track)
+    if not ext.upper() in self.EXTENSIONS:
+      print "[LIBRARY] Error: Did not remove %s because file was not in tracked extensions."
+      return False
     # Library removal
-    if 'tags' in self.map_track_info[track]:
-      for tag in self.map_track_info[track]['tags']:
+    if not track in self.map_track_info:
+      print "[LIBRARY] Warning: Could not remove %s from library because it does not exist." % track
+      return True
+    # Traverse taglist in order to remove from the Auto ones
+    for tag in self.map_tag_tracks.keys():
+      if track in self.map_tag_tracks[tag]:
         self.map_tag_tracks[tag].remove(track)
         if len(self.map_tag_tracks[tag]) == 0:
           del self.map_tag_tracks[tag]
@@ -110,6 +119,7 @@ class Library:
       print "[LIBRARY] Track moved to trash: %s" % track
     # Save
     self.save_database()
+    return True
 
   def get_track_coverart(self, file):
     def try_fetch_from_filesystem():
@@ -197,13 +207,17 @@ class Library:
         read_info(audio, self.MAP_ID3_FIELDS)
       except mutagen.id3.ID3NoHeaderError:
         print 'Warning: No ID3 header found in file %s' % file
+      except mutagen.id3.ID3BadUnsynchData:
+        print 'Warning: ID3BadUnsynchData while trying to read ID3 in file %s' % file
+        return None
     elif extension.upper() == '.FLAC':
       audio = FLAC(file)
       read_info(audio, self.MAP_FLAC_FIELDS)
 
     return info
 
-  def init(self):
+  def init(self, server):
+    self.server = server
     try:
       f = open(self.DATABASE_FILENAME, 'r')
       data = json.loads(f.read())
@@ -236,6 +250,28 @@ class Library:
       }
     )
 
+  def rename_tag(self, old, new):
+    # Declare new tag
+    if not new in self.map_tag_tracks.keys():
+      self.map_tag_tracks[new] = []
+    # Fetch tracks to modify
+    tracks = self.map_tag_tracks[old]
+    # Loop through them
+    for track in tracks:
+      # Fetch a track's tags
+      tags = self.map_track_info[track]['tags']
+      # Modify
+      tags.remove(old)
+      tags.append(new)
+      # Commit on file and db
+      self.write_field(track, 'tags', tags, bypassdbwrite=True)
+      # Update the taglist
+      self.map_tag_tracks[new].append(track)
+    # Delete old tag
+    del self.map_tag_tracks[old]
+    # Save
+    self.save_database()
+
   def scan_file(self, temp_map_tag_tracks, temp_map_track_info, dirname, filename):
     file = unicode(os.path.join(dirname, filename), 'utf8')
     unused, ext = os.path.splitext(filename)
@@ -265,6 +301,12 @@ class Library:
         if (datetime.now() - datetime.strptime(temp_map_track_info[file]['first_added'],
                                                self.DATETIME_TAG_FORMAT)).days <= 90:
             temp_map_tag_tracks['!RecentlyAdded'] += [file]
+            # Sort !RecentlyAdded by first_added
+            temp_map_tag_tracks['!RecentlyAdded'] = sorted(
+              temp_map_tag_tracks['!RecentlyAdded'],
+              key=lambda track: temp_map_track_info[track]['first_added'],
+              reverse=True,
+            )
 
         # !NeverPlayed
         if not 'play_counter' in temp_map_track_info[file]:
@@ -288,6 +330,8 @@ class Library:
       print '[LIBRARY] Unsupported %s format %s' % (ext.upper(), file)
 
   def scan_library(self):
+    self.server.player.update_library()
+
     temp_map_tag_tracks = {}
     temp_map_track_info = {}
     for tag in self.SPECIAL_TAGS:
@@ -300,41 +344,10 @@ class Library:
         for filename in filenames:
           self.scan_file(temp_map_tag_tracks, temp_map_track_info, dirname, filename)
 
-    # Postprocessing begins
-
-    # Sort !RecentlyAdded by first_added
-    temp_map_tag_tracks['!RecentlyAdded'] = sorted(
-      temp_map_tag_tracks['!RecentlyAdded'],
-      key=lambda track: temp_map_track_info[track]['first_added'],
-      reverse=True,
-    )
-
     print '[LIBRARY] Library scan finished'
     # Commit to memory and disk
     self.map_tag_tracks = temp_map_tag_tracks
     self.map_track_info = temp_map_track_info
-    self.save_database()
-
-  def rename_tag(self, old, new):
-    # Declare new tag
-    if not new in self.map_tag_tracks.keys():
-      self.map_tag_tracks[new] = []
-    # Fetch tracks to modify
-    tracks = self.map_tag_tracks[old]
-    # Loop through them
-    for track in tracks:
-      # Fetch a track's tags
-      tags = self.map_track_info[track]['tags']
-      # Modify
-      tags.remove(old)
-      tags.append(new)
-      # Commit on file and db
-      self.write_field(track, 'tags', tags, bypassdbwrite=True)
-      # Update the taglist
-      self.map_tag_tracks[new].append(track)
-    # Delete old tag
-    del self.map_tag_tracks[old]
-    # Save
     self.save_database()
 
   def save_database(self):
@@ -393,12 +406,17 @@ class Library:
       time.sleep(self.WATCHDOG_POLL_PERIOD_SECONDS)
       new = DirState(d)
       diff = new - ref
+      for file_deleted in diff['deleted']:
+        print '[LIBRARY] Watchdog detected deletion of %s' % file_deleted
+        self.delete(unicode(os.path.join(dirpath,file_deleted), 'utf8'), IOremoval=False)
       for file_added in diff['created']:
         print '[LIBRARY] Watchdog detected a new file: %s' % file_added
         self.scan_file(self.map_tag_tracks, self.map_track_info, dirpath, file_added)
-      for file_deleted in diff['deleted']:
-        print '[LIBRARY] Watchdog detected deletion of %s' % file_deleted
-        self.delete(os.path.join(dirpath,file_deleted), IOremoval=False)
+      # MPC Update
+      if len(diff['deleted']) + len(diff['created']) > 0:
+        self.server.player.update_library()
+        # Save
+        self.save_database()
       ref = new
 
 
