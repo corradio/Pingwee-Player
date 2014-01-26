@@ -60,6 +60,8 @@ class CDBurner:
           call(cmd, shell=True)
         tmptracks.append(newtrack)
 
+    # TODO: Can we order tracks by BPM without renaming them?
+
     # TODO: Check the file format is compatible
     # Remember to add the necessary flags to mkisofs
     #       Maybe make a folder by artist? or by BPM range?

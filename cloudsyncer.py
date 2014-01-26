@@ -23,12 +23,12 @@ class CloudSyncer:
   def remove_file(self, file):
     filename = os.path.basename(file)
     dst = os.path.join(self.CLOUD_PATH, filename)
-    os.path.remove(file)
+    os.remove(file)
 
   def sync(self):
     # TODO(olc)The idea here is to read a changelog.json file, and then taking action on playcounts...
     print "[CLOUDSYNCER] Warning: file names must be uniques. Use some method to check that it holds."
-    
+
     # Read the db file to see if any file has been deleted
     if os.path.exists(self.DB_FILE):
       f = open(self.DB_FILE, 'r')
@@ -55,7 +55,7 @@ class CloudSyncer:
       'TrackInfos': [self.server.library.map_track_info[track] for track in tracks],
       'GeneratedAt': '[TOBEIMPLEMENTED]'
     }
-    
+
     # Copy files
     for filepath in tracks:
       filename = os.path.basename(filepath)

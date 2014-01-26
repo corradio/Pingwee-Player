@@ -384,6 +384,9 @@ class Library:
     if not track in self.map_track_info:
       print '[LIBRARY] Error: Could not untag track %s because it does not exist.' % track
       return False
+    if not 'tags' in self.map_track_info[track]:
+      print '[LIBRARY] Error: Could not untag track %s because it has no tags.' % track
+      return False
     tags = self.map_track_info[track]['tags']
     if not tag in tags:
       print '[LIBRARY] Warning: Could not untag from track %s because it was not previously tagged as "%s".' % (track, tag)

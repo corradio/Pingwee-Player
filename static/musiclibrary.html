@@ -33,7 +33,7 @@
             <i ng-show="$index<currentlyplaying.index" class="icon-empty"></i>
             <i ng-show="$index>currentlyplaying.index" class="icon-time"></i>
             <span ng-click="player.select_track($index)">
-              {{track.artist}} - {{track.title}} 
+              {{track.artist}} - {{track.title}}
               <span ng-show="track.player_counter" style="playcounter">[{{track.play_counter}}x]</span>
               <span ng-show="track.replaygain_track_gain" style="replaygain"><sup>RG</sup></span>
               <span ng-show="track.bpm" style="bpm"><sup>{{track.bpm}}bpm</sup></span>
@@ -43,8 +43,12 @@
       </div>
       <div id="tageditpanel">
         <div id="tagedits">
-          <div class="cover">
-            <img id="cover" ng-src="{{coverdata}}"></img>
+          <div class="cover" id="cover">
+            <div>
+              <img id="cover1" class="fadeable" ng-src="{{editpane.coverdata1.img}}" ng-class="{from: !editpane.coverdata1.visible, to: editpane.coverdata1.visible}"></img>
+              <img id="cover2" class="fadeable" ng-src="{{editpane.coverdata2.img}}" ng-class="{from: !editpane.coverdata2.visible, to: editpane.coverdata2.visible}"></img>
+              <img src="data:image/gif;base64,R0lGODlhAQABAIAAAP///////yH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=="></div>
+            </div>
           </div>
           <ul id="edit-tags" class="unstyled" width="500px">
             <li data-ng-repeat="tag in selectedtrack_taglist" ng-show="!tag.is_special">
@@ -67,7 +71,8 @@
       <textarea id="edittextarea" ng-show="edit" style="width:700px; height:200px" ng-model="trackrawdata_stringified"></textarea>
     </div>
 
-    <div id="backgroundcontainer" back-img="{{currentlyplaying.cover}}"></div>
+    <div class="backgroundcontainer fadeable" back-img="{{currentlyplaying.cover1.img}}" ng-class="{to: currentlyplaying.cover1.visible, from: !currentlyplaying.cover1.visible}"></div>
+    <div class="backgroundcontainer fadeable" back-img="{{currentlyplaying.cover2.img}}" ng-class="{to: currentlyplaying.cover2.visible, from: !currentlyplaying.cover2.visible}"></div>
 
     <script src="js/angular.min.js"></script>
     <script src="js/jquery-1.9.1.min.js"></script>

@@ -9,10 +9,14 @@ function MainController($scope, socket, keyboardManager) {
   $scope.scan_state = "";
   $scope.debug = false;
   $scope.edit = false;
+  $scope.editpane = {}
+  $scope.editpane['coverdata1'] = {img: undefined, visible: true}
+  $scope.editpane['coverdata2'] = {img: undefined, visible: false}
 
   // Model definition with default values
   $scope.currentlyplaying = {}
-  $scope.currentlyplaying['cover'] = undefined
+  $scope.currentlyplaying['cover1'] = {img: undefined, visible: true}
+  $scope.currentlyplaying['cover2'] = {img: undefined, visible: false}
   $scope.currentlyplaying['index'] = undefined
 
   // Socket handlers
@@ -150,10 +154,31 @@ function MainController($scope, socket, keyboardManager) {
   });
   socket.on('get_coverart', function(data) {
     if ($scope.trackIDs[$scope.currentlyplaying.index] == data.Track) {
-      $scope.currentlyplaying.cover = data.data
+      if ($scope.currentlyplaying.cover1.visible){
+        from = $scope.currentlyplaying.cover1;
+        to = $scope.currentlyplaying.cover2;
+      } else {
+        from = $scope.currentlyplaying.cover2;
+        to = $scope.currentlyplaying.cover1;
+      }
+      // Check that the image has indeed changed
+      //if (from.img != data.data) {
+      to.img = data.data;
+      to.visible = true;
+      from.visible = false;
+      //}
     }
     if ($scope.trackIDs[$scope.selected_track_index] == data.Track) {
-      $scope.coverdata = data.data;
+      if ($scope.editpane.coverdata1.visible) {
+        from = $scope.editpane.coverdata1;
+        to = $scope.editpane.coverdata2;
+      } else {
+        from = $scope.editpane.coverdata2;
+        to = $scope.editpane.coverdata1;
+      }
+      to.img = data.data;
+      to.visible = true;
+      from.visible = false;
     }
   });
   socket.on('queue_changed', function(data) {
