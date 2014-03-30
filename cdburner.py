@@ -92,7 +92,7 @@ class CDBurner:
       print "[BURN] Error burning CD"
       return False
 
-    shutil.rmtree(self.PATH_TO_TEMPFOLDER)
+    #shutil.rmtree(self.PATH_TO_TEMPFOLDER)
     print "[BURN] Done!"
 
     return True

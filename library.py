@@ -13,7 +13,7 @@ from mutagen.apev2 import APEv2
 from mutagen.flac import FLAC
 from mutagen.id3 import ID3, TXXX, ID3NoHeaderError
 from mutagen.mp3 import MP3
-from subprocess import call
+from subprocess import call, Popen, PIPE
 from threading import Thread
 
 class Library:
@@ -72,6 +72,12 @@ class Library:
     "/Users/olc/Music/iTunes/iTunes Media",
     "/Users/olc/Music/Logic",
     "/Users/olc/Music/Library",
+  ]
+
+  EXCLUDED_FOLDER_NAMES = [
+    "Samples",
+    "Stems",
+    "BTSync"
   ]
 
   PODCAST_DIRECTORIES = [
@@ -299,7 +305,7 @@ class Library:
           temp_map_track_info[file]['first_added'] = first_added
           print 'Welcome to the library %s' % file
         if (datetime.now() - datetime.strptime(temp_map_track_info[file]['first_added'],
-                                               self.DATETIME_TAG_FORMAT)).days <= 90:
+                                               self.DATETIME_TAG_FORMAT)).days <= 90*2:
             temp_map_tag_tracks['!RecentlyAdded'] += [file]
             # Sort !RecentlyAdded by first_added
             temp_map_tag_tracks['!RecentlyAdded'] = sorted(
@@ -324,6 +330,19 @@ class Library:
           # Re-read tags
           temp_map_track_info[file] = self.get_track_info(file)
 
+        # BPM Detection
+        if (not 'bpm' in temp_map_track_info[file] 
+          and not file in temp_map_tag_tracks['!Podcast']):
+          proc = Popen('sox -V1 "%s" -r 44100 -e float -c 1 -t raw - | bin/bpm' % file, 
+            shell=True, 
+            stdout=PIPE)
+          proc.wait()
+          bpm = proc.stdout.readline().rstrip()
+          print '[LIBRARY] File %s has been detected at %s bpm' % (file, bpm)
+          self.write_field(file, 'bpm', bpm, bypassdbwrite=True)
+          # Re-read tags
+          temp_map_track_info[file]['bpm'] = bpm
+
       except Exception, e:
         traceback.print_exc()
     elif ext.upper() in ['.WAV', '.OGG']:
@@ -340,6 +359,8 @@ class Library:
     print '[LIBRARY] Library scan started'
     for library in self.LIBRAIRIES:
       for dirname, dirnames, filenames in os.walk(library):
+        if dirname in self.EXCLUDED_FOLDER_NAMES:
+          continue
         #print 'Scanning %s' % dirname
         for filename in filenames:
           self.scan_file(temp_map_tag_tracks, temp_map_track_info, dirname, filename)
@@ -429,6 +450,7 @@ class Library:
     if not bypassdbwrite:
       self.save_database()
 
+  # Write both in db and file
   def write_field(self, file, field, value, bypassdbwrite=False):
     filename, extension = os.path.splitext(file)
     if extension.upper() == '.MP3':
