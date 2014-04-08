@@ -77,7 +77,8 @@ class Library:
   EXCLUDED_FOLDER_NAMES = [
     "Samples",
     "Stems",
-    "BTSync"
+    "BTSync",
+    "Audio Files"
   ]
 
   PODCAST_DIRECTORIES = [

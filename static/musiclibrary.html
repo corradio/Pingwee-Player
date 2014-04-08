@@ -36,7 +36,7 @@
               {{track.artist}} - {{track.title}}
               <span ng-show="track.player_counter" style="playcounter">[{{track.play_counter}}x]</span>
               <span ng-show="track.replaygain_track_gain" style="replaygain"><sup>RG</sup></span>
-              <span ng-show="track.bpm" style="bpm"><sup>{{track.bpm}}bpm</sup></span>
+              <span ng-show="track.bpm" style="bpm"><sup>{{ $parent.formatBpm(track.bpm) }}bpm</sup></span>
             </span>
           </li>
         </ul>

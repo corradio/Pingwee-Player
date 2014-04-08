@@ -49,7 +49,7 @@ class CDBurner:
         parent = os.path.dirname(track)
         filename = os.path.basename(track)
         if 'bpm' in info:
-          newname = '%s %s - %s%s' % (info['bpm'], info['artist'], info['title'], fileext)
+          newname = '%s %s - %s%s' % (int(float(info['bpm'])), info['artist'], info['title'], fileext)
         else:
           newname = '%s - %s%s' % (info['artist'], info['title'], fileext)
         print 'Processing %s' % os.path.join(parent, newname)
@@ -85,6 +85,7 @@ class CDBurner:
 
     cmd = [
       self.PATH_TO_CDRECORD,
+      "-eject",
       self.PATH_TO_TEMPFOLDER + "temp.iso"
     ]
     

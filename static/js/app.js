@@ -2,6 +2,11 @@ var app = angular.module('musikApp', []);
 
 function MainController($scope, socket, keyboardManager) {
 
+  // Formatting values
+  $scope.formatBpm = function (arg) {
+    return Math.round(arg)
+  }
+
   // Default values
   $scope.player_state = 'stop';
   $scope.selected_track_index = 0;
